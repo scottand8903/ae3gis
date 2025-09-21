@@ -31,9 +31,9 @@ export default function RootLayout({
       > */}
       <body className="flex flex-col min-h-screen font-sans bg-white text-black dark:bg-black dark:text-white antialiased">
         {/* Navbar */}
-        <header className="w-full border-b border-solid border-black/[.08] dark:border-white/[.145]">
+        {/* <header className="w-full border-b border-solid border-black/[.08] dark:border-white/[.145]">
           <nav className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
-            <h1 className="text-lg font-medium">My Test App</h1>
+            <h1 className="text-lg font-medium">Aegis</h1>
             <ul className="ml-auto flex items-center space-x-4">
               <li>
                 <Link
@@ -61,19 +61,19 @@ export default function RootLayout({
               </li>
             </ul>
           </nav>
-        </header>
+        </header> */}
 
         {/* Main content */}
         <main className="flex-grow">{children}</main>
 
         {/* Footer */}
-        <footer className="w-full border-t border-solid border-black/[.08] dark:border-white/[.145]">
+        {/* <footer className="w-full border-t border-solid border-black/[.08] dark:border-white/[.145]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-center">
             <p className="text-sm text-gray-500">
-              &copy; 2024 My Test App. All rights reserved.
+              &copy; 2025 Aegis. All rights reserved.
             </p>
           </div>
-        </footer>
+        </footer> */}
         {/* {children} */}
       </body>
     </html>
