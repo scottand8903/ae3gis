@@ -1,5 +1,6 @@
-"use client"; // needed in Next.js App Router
+"use client";
 import { useDrag, useDrop } from "react-dnd";
+import { useRef } from "react";
 
 type DraggableBoxProps = {
   id: number;
@@ -7,6 +8,7 @@ type DraggableBoxProps = {
   left: number;
   top: number;
   moveBox: (id: number, left: number, top: number) => void;
+  dropZoneRef: React.RefObject<HTMLDivElement | null>;
 };
 
 export default function DraggableBox({
@@ -15,49 +17,43 @@ export default function DraggableBox({
   left,
   top,
   moveBox,
+  dropZoneRef,
 }: DraggableBoxProps) {
+  const ref = useRef<HTMLDivElement | null>(null);
+
   const [{ isDragging }, drag] = useDrag(() => ({
-    type: "DROPPED_ITEM",
-    item: { id, left, top },
+    type: "BOX",
+    item: { id, left, top, name },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
-    end: (item, monitor) => {
-      const offset = monitor.getSourceClientOffset();
-      if (offset) {
-        moveBox(item.id, offset.x, offset.y);
-      }
-    },
   }));
 
   const [, drop] = useDrop(() => ({
-    accept: "DROPPED_ITEM",
+    accept: "BOX",
     hover(item: { id: number; left: number; top: number }, monitor) {
-      if (item.id !== id) {
-        return;
+      if (item.id !== id) return;
+
+      const offset = monitor.getSourceClientOffset();
+      const rect = dropZoneRef.current?.getBoundingClientRect();
+
+      if (offset && rect) {
+        const newLeft = offset.x - rect.left;
+        const newTop = offset.y - rect.top;
+        moveBox(item.id, newLeft, newTop);
+
+        // keep item position updated (prevents jitter)
+        item.left = newLeft;
+        item.top = newTop;
       }
-
-      const delta = monitor.getDifferenceFromInitialOffset();
-      if (!delta) {
-        return;
-      }
-
-      const newLeft = Math.round(item.left + delta.x);
-      const newTop = Math.round(item.top + delta.y);
-
-      moveBox(item.id, newLeft, newTop);
-
-      // Update the item's position to prevent jittering
-      item.left = newLeft;
-      item.top = newTop;
     },
   }));
 
+  drag(drop(ref));
+
   return (
     <div
-      ref={(node) => {
-        if (node) drag(drop(node));
-      }}
+      ref={ref}
       className={`absolute p-2 bg-blue-500 text-white rounded cursor-move ${
         isDragging ? "opacity-50" : "opacity-100"
       }`}

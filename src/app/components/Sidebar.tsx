@@ -1,24 +1,3 @@
-// import Link from "next/link";
-
-// export default function Sidebar() {
-//   return (
-//     <aside className="w-64 h-screen bg-gray-900 text-white flex flex-col p-4">
-//       <h1 className="text-2xl font-bold mb-6">MyApp</h1>
-//       <nav className="flex flex-col gap-4">
-//         <Link href="/" className="hover:bg-gray-700 p-2 rounded">
-//           Dashboard
-//         </Link>
-//         <Link href="/settings" className="hover:bg-gray-700 p-2 rounded">
-//           Settings
-//         </Link>
-//         <Link href="/profile" className="hover:bg-gray-700 p-2 rounded">
-//           Profile
-//         </Link>
-//       </nav>
-//     </aside>
-//   );
-// }
-
 "use client"; // needed in Next.js App Router
 import { useState } from "react";
 import Link from "next/link";

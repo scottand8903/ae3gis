@@ -1,14 +1,18 @@
-import Layout from "./components/Layout";
+"use client";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import Sidebar from "./components/Sidebar";
 import MainDropZone from "./components/MainDropZone";
 
-export default function HomePage() {
+export default function Page() {
   return (
-    <Layout>
-      {/* <div className="flex items-center justify-center h-screen font-sans text-center p-8 sm:p-20"> */}
-      <h1 className="text-3xl font-bold">Welcome</h1>
-      <p>This is the main content area.</p>
-      <MainDropZone />
-      {/* </div> */}
-    </Layout>
+    <DndProvider backend={HTML5Backend}>
+      <div className="flex">
+        <Sidebar />
+        <div className="flex-1 p-4">
+          <MainDropZone />
+        </div>
+      </div>
+    </DndProvider>
   );
 }

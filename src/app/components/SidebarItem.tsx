@@ -1,25 +1,30 @@
 "use client";
 import { useDrag } from "react-dnd";
-import { useRef } from "react"; // import useRef
+import type { SidebarItem as SidebarItemType } from "./types";
 
-export default function SidebarItem({ name }: { name: string }) {
-  const ref = useRef<HTMLDivElement>(null); // create a ref for the div
-  const [{ isDragging }, drag] = useDrag(() => ({
+type Props = { name: string };
+
+export default function SidebarItem({ name }: Props) {
+  const [{ isDragging }, drag] = useDrag<
+    SidebarItemType,
+    void,
+    { isDragging: boolean }
+  >(() => ({
     type: "SIDEBAR_ITEM",
-    item: { type: "SIDEBAR_ITEM", name }, // include type and name in the item
+    item: { type: "SIDEBAR_ITEM", name },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
   }));
 
-  drag(ref); // attach drag to the ref
-
   return (
     <div
-      ref={ref} // attach the ref to the div
-      className={`p-2 rounded cursor-move ${
+      ref={(node) => {
+        if (node) drag(node);
+      }}
+      className={`p-2 m-1 bg-blue-600 rounded cursor-move ${
         isDragging ? "opacity-50" : "opacity-100"
-      } hover:bg-gray-700`}
+      }`}
     >
       {name}
     </div>
