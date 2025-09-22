@@ -22,7 +22,8 @@
 "use client"; // needed in Next.js App Router
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight } from "lucide-react"; // optional icons
+import { ChevronDown, ChevronRight } from "lucide-react"; // pnpm add lucide-react
+import SidebarItem from "./SidebarItem";
 
 export default function Sidebar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -43,16 +44,22 @@ export default function Sidebar() {
           className="flex items-center justify-between hover:bg-gray-700 p-2 rounded"
         >
           <span>Scenario Builder</span>
-          {openMenu === "dashboard" ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          {openMenu === "dashboard" ? (
+            <ChevronDown size={16} />
+          ) : (
+            <ChevronRight size={16} />
+          )}
         </button>
         {openMenu === "dashboard" && (
           <div className="ml-4 flex flex-col gap-1">
-            <Link href="/overview" className="hover:bg-gray-700 p-2 rounded">
+            <SidebarItem name="Widget A" />
+            {/* <Link href="/overview" className="hover:bg-gray-700 p-2 rounded">
               Temp1
-            </Link>
-            <Link href="/reports" className="hover:bg-gray-700 p-2 rounded">
+            </Link> */}
+            <SidebarItem name="Widget B" />
+            {/* <Link href="/reports" className="hover:bg-gray-700 p-2 rounded">
               Temp2
-            </Link>
+            </Link> */}
           </div>
         )}
 
@@ -62,7 +69,11 @@ export default function Sidebar() {
           className="flex items-center justify-between hover:bg-gray-700 p-2 rounded"
         >
           <span>Scenarios</span>
-          {openMenu === "settings" ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          {openMenu === "settings" ? (
+            <ChevronDown size={16} />
+          ) : (
+            <ChevronRight size={16} />
+          )}
         </button>
         {openMenu === "settings" && (
           <div className="ml-4 flex flex-col gap-1">
