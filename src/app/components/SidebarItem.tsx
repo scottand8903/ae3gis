@@ -6,7 +6,7 @@ export default function SidebarItem({ name }: { name: string }) {
   const ref = useRef<HTMLDivElement>(null); // create a ref for the div
   const [{ isDragging }, drag] = useDrag(() => ({
     type: "SIDEBAR_ITEM",
-    item: { name },
+    item: { type: "SIDEBAR_ITEM", name }, // include type and name in the item
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),

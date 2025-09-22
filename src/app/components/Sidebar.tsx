@@ -52,14 +52,18 @@ export default function Sidebar() {
         </button>
         {openMenu === "dashboard" && (
           <div className="ml-4 flex flex-col gap-1">
-            <SidebarItem name="Widget A" />
-            {/* <Link href="/overview" className="hover:bg-gray-700 p-2 rounded">
-              Temp1
-            </Link> */}
-            <SidebarItem name="Widget B" />
-            {/* <Link href="/reports" className="hover:bg-gray-700 p-2 rounded">
-              Temp2
-            </Link> */}
+            <SidebarItem name="Apache-server" />
+            <SidebarItem name="iptables" />
+            <SidebarItem name="Malicious-client" />
+            <SidebarItem name="Benign-client" />
+            <SidebarItem name="isc-dhcp-server" />
+            <SidebarItem name="isc-dhcp-server-amd" />
+            <SidebarItem name="Openvswitch-xp" />
+            <SidebarItem name="firehol-xp" />
+            <SidebarItem name="nftables-xp" />
+            <SidebarItem name="Wazuh-manager-amd" />
+            <SidebarItem name="Wazuh-agent-amd" />
+            <SidebarItem name="Wazun-manager" />
           </div>
         )}
 
