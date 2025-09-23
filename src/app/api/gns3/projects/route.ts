@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 
 // Update this with your GNS3 server IP and port
-const GNS3_URL = "http://192.168.56.102:80/v2";
+const GNS3_URL = process.env.GNS3_URL;
 
 export async function GET() {
   try {

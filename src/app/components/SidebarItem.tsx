@@ -2,16 +2,16 @@
 import { useDrag } from "react-dnd";
 import type { SidebarItem as SidebarItemType } from "./types";
 
-type Props = { name: string };
+type Props = { name: string; templateId: string };
 
-export default function SidebarItem({ name }: Props) {
+export default function SidebarItem({ name, templateId }: Props) {
   const [{ isDragging }, drag] = useDrag<
     SidebarItemType,
     void,
     { isDragging: boolean }
   >(() => ({
     type: "SIDEBAR_ITEM",
-    item: { type: "SIDEBAR_ITEM", name },
+    item: { type: "SIDEBAR_ITEM", name, templateId },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),

@@ -1,6 +1,7 @@
 export type SidebarItem = {
   type: "SIDEBAR_ITEM";
   name: string;
+  templateId: string;
 };
 
 export type BoxItem = {

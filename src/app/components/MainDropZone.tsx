@@ -7,6 +7,7 @@ import type { DndItem } from "./types";
 type DroppedItem = {
   id: number;
   name: string;
+  templateId: string;
   left: number;
   top: number;
 };
@@ -23,7 +24,7 @@ export default function MainDropZone() {
 
   const [, drop] = useDrop<DndItem>(() => ({
     accept: ["SIDEBAR_ITEM", "BOX"],
-    drop: (item, monitor) => {
+    drop: async (item, monitor) => {
       if (item.type === "SIDEBAR_ITEM") {
         const offset = monitor.getClientOffset();
         const rect = dropRef.current?.getBoundingClientRect();
@@ -31,10 +32,37 @@ export default function MainDropZone() {
         if (offset && rect) {
           const left = offset.x - rect.left;
           const top = offset.y - rect.top;
-          setItems((prev) => [
-            ...prev,
-            { id: Date.now(), name: item.name, left, top },
-          ]);
+
+          // Add locally so you see it right away
+          const newItem = {
+            id: Date.now(),
+            name: item.name,
+            templateId: item.templateId,
+            left,
+            top,
+          };
+          setItems((prev) => [...prev, newItem]);
+
+          try {
+            const projectId = "391a9fde-246c-4473-9024-202ff316c48a"; // replace with actual project ID
+
+            const response = await fetch("/api/gns3/spawn-nodes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                projectId: projectId,
+                templateId: item.templateId,
+                x: left,
+                y: top,
+                name: item.name,
+              }),
+            });
+            // const data = await response.json();
+            // console.log("Project ID @:", projectId);
+            // console.log("Template ID @:", item.templateId);
+          } catch (err) {
+            console.error("Error spawning node:", err);
+          }
         }
       }
     },
