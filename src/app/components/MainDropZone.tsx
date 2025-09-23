@@ -1,7 +1,9 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDrop } from "react-dnd";
 import DraggableBox from "./DraggableBox";
+import ProjectSelector from "./ProjectSelector";
+import SaveScenarioButton from "./SaveScenario";
 import type { DndItem } from "./types";
 
 type DroppedItem = {
@@ -12,9 +14,45 @@ type DroppedItem = {
   top: number;
 };
 
+type Project = {
+  project_id: string;
+  name: string;
+};
+
 export default function MainDropZone() {
   const dropRef = useRef<HTMLDivElement | null>(null);
   const [items, setItems] = useState<DroppedItem[]>([]);
+  const [templates, setTemplates] = useState<Record<string, string>>({});
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
+  // Fetch templates + projects
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [tplRes, projRes] = await Promise.all([
+          fetch("/api/gns3/templates"),
+          fetch("/api/gns3/projects"),
+        ]);
+
+        const tplData = await tplRes.json();
+        const projData = await projRes.json();
+
+        // Convert template list into a name→id map
+        const templateMap: Record<string, string> = {};
+        tplData.forEach((t: any) => {
+          templateMap[t.name] = t.template_id;
+        });
+
+        setTemplates(templateMap);
+        setProjects(projData);
+      } catch (err) {
+        console.error("Error fetching data:", err);
+      }
+    }
+
+    fetchData();
+  }, []);
 
   const moveBox = (id: number, left: number, top: number) => {
     setItems((prev) =>
@@ -24,7 +62,7 @@ export default function MainDropZone() {
 
   const [, drop] = useDrop<DndItem>(() => ({
     accept: ["SIDEBAR_ITEM", "BOX"],
-    drop: async (item, monitor) => {
+    drop: (item, monitor) => {
       if (item.type === "SIDEBAR_ITEM") {
         const offset = monitor.getClientOffset();
         const rect = dropRef.current?.getBoundingClientRect();
@@ -33,7 +71,6 @@ export default function MainDropZone() {
           const left = offset.x - rect.left;
           const top = offset.y - rect.top;
 
-          // Add locally so you see it right away
           const newItem = {
             id: Date.now(),
             name: item.name,
@@ -42,40 +79,31 @@ export default function MainDropZone() {
             top,
           };
           setItems((prev) => [...prev, newItem]);
-
-          try {
-            const projectId = "391a9fde-246c-4473-9024-202ff316c48a"; // replace with actual project ID
-
-            const response = await fetch("/api/gns3/spawn-nodes", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                projectId: projectId,
-                templateId: item.templateId,
-                x: left,
-                y: top,
-                name: item.name,
-              }),
-            });
-            // const data = await response.json();
-            // console.log("Project ID @:", projectId);
-            // console.log("Template ID @:", item.templateId);
-          } catch (err) {
-            console.error("Error spawning node:", err);
-          }
         }
       }
     },
   }));
 
-  drop(dropRef); // attach drop behavior to the ref
+  drop(dropRef);
 
   return (
-    <div
-      ref={dropRef}
-      className="relative min-h-[900px] border-2 rounded bg-gray-700"
-    >
+    <div className="relative h-screen border-2 rounded bg-gray-700 overflow-hidden" ref={dropRef}>
       <h2 className="font-bold p-2">Drop Items Here</h2>
+
+      <ProjectSelector
+        projects={projects}
+        selectedProject={selectedProject}
+        onSelect={setSelectedProject}
+      />
+
+      <div className="absolute bottom-2 right-2">
+        <SaveScenarioButton
+          items={items}
+          templates={templates}
+          selectedProject={selectedProject}
+        />
+      </div>
+
       {items.map((item) => (
         <DraggableBox
           key={item.id}
