@@ -41,7 +41,7 @@ export default function MainDropZone() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const [linkMode, setLinkMode] = useState(false);
-  const [selectedNode, setSelectedNode] = useState<DroppedItem | null>(null);
+  // const [selectedNode, setSelectedNode] = useState<DroppedItem | null>(null);
   const [links, setLinks] = useState<Link[]>([]);
   const [usedAdapters, setUsedAdapters] = useState<UsedAdapter[]>([]);
   const [selectedNodeData, setSelectedNodeData] = useState<{
