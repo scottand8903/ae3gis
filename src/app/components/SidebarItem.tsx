@@ -16,7 +16,7 @@ export default function SidebarItem({ name, templateId }: Props) {
   >(
     () => ({
       type: "SIDEBAR_ITEM",
-      item: { type: "SIDEBAR_ITEM", name: itemName, templateId },
+      item: { type: "SIDEBAR_ITEM", name, templateId },
       collect: (monitor) => ({
         isDragging: monitor.isDragging(),
       }),
@@ -41,7 +41,10 @@ export default function SidebarItem({ name, templateId }: Props) {
           placeholder="Enter a name"
           className="w-full p-1 bg-blue border border-gray-400 rounded"
         />
-        <button type="submit" className="mt-1 px-2 py-1 bg-green-500 text-blue rounded">
+        <button
+          type="submit"
+          className="mt-1 px-2 py-1 bg-green-500 text-blue rounded"
+        >
           Done
         </button>
       </form>
