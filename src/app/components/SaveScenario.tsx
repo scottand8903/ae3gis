@@ -14,16 +14,26 @@ type Project = {
   name: string;
 };
 
+type Link = {
+  nodes: {
+    node_id: string;
+    adapter_number: number;
+    port_number: number;
+  }[];
+};
+
 interface SaveScenarioButtonProps {
   items: DroppedItem[];
   templates: Record<string, string>;
   selectedProject: Project | null;
+  links: Link[];
 }
 
 export default function SaveScenarioButton({
   items,
   templates,
   selectedProject,
+  links,
 }: SaveScenarioButtonProps) {
   const saveScenario = () => {
     if (!selectedProject) {
@@ -44,6 +54,7 @@ export default function SaveScenarioButton({
       project_id: selectedProject.project_id,
       templates,
       nodes,
+      links,
     };
 
     const filename = prompt("Enter a file name:", "scenario.json");

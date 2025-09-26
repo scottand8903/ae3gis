@@ -28,6 +28,11 @@ type Link = {
   }[];
 };
 
+type UsedAdapter = {
+  nodeId: number;
+  adapterNumber: number;
+};
+
 export default function MainDropZone() {
   const dropRef = useRef<HTMLDivElement | null>(null);
   const [items, setItems] = useState<DroppedItem[]>([]);
@@ -38,6 +43,11 @@ export default function MainDropZone() {
   const [linkMode, setLinkMode] = useState(false);
   const [selectedNode, setSelectedNode] = useState<DroppedItem | null>(null);
   const [links, setLinks] = useState<Link[]>([]);
+  const [usedAdapters, setUsedAdapters] = useState<UsedAdapter[]>([]);
+  const [selectedNodeData, setSelectedNodeData] = useState<{
+    node: DroppedItem;
+    adapter: number;
+  } | null>(null);
 
   // Fetch templates + projects
   useEffect(() => {
@@ -77,11 +87,13 @@ export default function MainDropZone() {
   const [, drop] = useDrop<DndItem>(() => ({
     accept: ["SIDEBAR_ITEM", "BOX"],
     drop: (item, monitor) => {
-      if (item.type === "SIDEBAR_ITEM") {
-        const offset = monitor.getClientOffset();
-        const rect = dropRef.current?.getBoundingClientRect();
+      const offset = monitor.getClientOffset();
+      const initialOffset = monitor.getInitialClientOffset();
+      const rect = dropRef.current?.getBoundingClientRect();
 
-        if (offset && rect) {
+      if (offset && rect) {
+        if (item.type === "SIDEBAR_ITEM") {
+          // For new items from sidebar, use direct position
           const left = offset.x - rect.left;
           const top = offset.y - rect.top;
 
@@ -93,6 +105,27 @@ export default function MainDropZone() {
             top,
           };
           setItems((prev) => [...prev, newItem]);
+        } else {
+          // For existing boxes, use the drag difference
+          if (initialOffset && "mouseOffset" in item) {
+            // Calculate new position accounting for mouse offset
+            const newLeft = offset.x - rect.left - (item.mouseOffset?.x || 0);
+            const newTop = offset.y - rect.top - (item.mouseOffset?.y || 0);
+
+            // Add constraints
+            const boxWidth = 100;
+            const boxHeight = 100;
+            const constrainedLeft = Math.max(
+              0,
+              Math.min(newLeft, rect.width - boxWidth)
+            );
+            const constrainedTop = Math.max(
+              0,
+              Math.min(newTop, rect.height - boxHeight)
+            );
+
+            moveBox(item.id, constrainedLeft, constrainedTop);
+          }
         }
       }
     },
@@ -100,83 +133,44 @@ export default function MainDropZone() {
 
   drop(dropRef);
 
-  // // Add locally so you see it right away
-  //           const newItem = {
-  //             id: Date.now(),
-  //             name: name,
-  //             templateId: item.templateId,
-  //             left,
-  //             top,
-  //           };
-  //           setItems((prev) => [...prev, newItem]);
-
-  //           try {
-  //             const projectId = "391a9fde-246c-4473-9024-202ff316c48a"; // replace with actual project ID
-
-  //             const response = await fetch("/api/gns3/spawn-nodes", {
-  //               method: "POST",
-  //               headers: { "Content-Type": "application/json" },
-  //               body: JSON.stringify({
-  //                 projectId: projectId,
-  //                 templateId: item.templateId,
-  //                 x: left,
-  //                 y: top,
-  //                 name: item.name,
-  //               }),
-  //             });
-  //             // const data = await response.json();
-  //             // console.log("Project ID @:", projectId);
-  //             // console.log("Template ID @:", item.templateId);
-  //           } catch (err) {
-  //             console.error("Error spawning node:", err);
-  //           }
-
-  // // Handle node click in link mode
-  // const handleNodeClick = (node: DroppedItem) => {
-  //   if (!linkMode) return;
-
-  //   if (selectedNodes.length === 0) {
-  //     setSelectedNodes([node]);
-  //   } else if (selectedNodes.length === 1) {
-  //     const first = selectedNodes[0];
-
-  //     // Add link between first and this one
-  //     const newLink: Link = {
-  //       nodes: [
-  //         { node_id: first.name, adapter_number: 0, port_number: 0 },
-  //         { node_id: node.name, adapter_number: 0, port_number: 0 },
-  //       ],
-  //     };
-
-  //     setLinks((prev) => [...prev, newLink]);
-  //     setSelectedNodes([]);
-  //   }
-  // };
-
-  const handleNodeClick = (clickedNode: DroppedItem) => {
-    if (!linkMode) return;
-
-    if (!selectedNode) {
-      // first node selected
-      setSelectedNode(clickedNode);
-    } else if (selectedNode.id !== clickedNode.id) {
-      // second node selected, create a link
+  const handleNodeClick = (clickedNode: DroppedItem, adapterNumber: number) => {
+    if (!linkMode) {
+      setLinkMode(true);
+      setSelectedNodeData({ node: clickedNode, adapter: adapterNumber });
+    } else if (
+      selectedNodeData &&
+      selectedNodeData.node.id !== clickedNode.id
+    ) {
+      // Create new network link
       const newLink: Link = {
         nodes: [
           {
-            node_id: selectedNode.name, // using name for now
-            adapter_number: 0,
+            node_id: selectedNodeData.node.name,
+            adapter_number: selectedNodeData.adapter,
             port_number: 0,
           },
           {
             node_id: clickedNode.name,
-            adapter_number: 0,
+            adapter_number: adapterNumber,
             port_number: 0,
           },
         ],
       };
       setLinks((prev) => [...prev, newLink]);
-      setSelectedNode(null); // reset selection
+
+      // Add used adapters to tracking
+      setUsedAdapters((prev) => [
+        ...prev,
+        {
+          nodeId: selectedNodeData.node.id,
+          adapterNumber: selectedNodeData.adapter,
+        },
+        { nodeId: clickedNode.id, adapterNumber: adapterNumber },
+      ]);
+
+      // Reset link mode
+      setLinkMode(false);
+      setSelectedNodeData(null);
     }
   };
 
@@ -191,34 +185,13 @@ export default function MainDropZone() {
       })),
       links,
     };
-
-    const blob = new Blob([JSON.stringify(scenario, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "scenario.json";
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
-  // const createLink = async (nodeA: string, nodeB: string) => {
-  //   try {
-  //     const projectId = "391a9fde-246c-4473-9024-202ff316c48a";
-  //     const response = await fetch("/api/gns3/create-link", {
-  //       method: "Post",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({ projectId, nodeA, nodeB }),
-  //     });
-
-  //     const data = await response.json();
-  //     console.log("Created link:", data);
-  //   } catch (err) {
-  //     console.error("Failed to create link:", err);
-  //   }
-  // };
+  const handleNameChange = (id: number, newName: string) => {
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, name: newName } : item))
+    );
+  };
 
   return (
     <div
@@ -236,8 +209,15 @@ export default function MainDropZone() {
         {linkMode ? "Link Mode: ON" : "Link Mode: OFF"}
       </button>
 
-      <button onClick={handleExport} className="px-3 py-1 rounded bg-blue-600">
-        Export Scenario
+      <SaveScenarioButton
+        items={items}
+        templates={templates}
+        selectedProject={selectedProject}
+        links={links}
+      />
+
+      <button onClick={handleExport} className="px-3 py-1 rounded bg-red-400">
+        Build Scenario
       </button>
 
       <ProjectSelector
@@ -246,29 +226,24 @@ export default function MainDropZone() {
         onSelect={setSelectedProject}
       />
 
-      <div className="absolute bottom-2 right-2">
-        <SaveScenarioButton
-          items={items}
-          templates={templates}
-          selectedProject={selectedProject}
-        />
-      </div>
-
       {items.map((item) => (
         <DraggableBox
           key={item.id}
-          id={item.id}
-          name={item.name}
-          left={item.left}
-          top={item.top}
+          {...item}
           moveBox={moveBox}
           dropZoneRef={dropRef}
-          onNodeClick={() => handleNodeClick(item)}
+          onNodeClick={(adapterId) => handleNodeClick(item, adapterId)}
+          onNameChange={handleNameChange}
+          isLinkMode={linkMode}
+          isSelected={selectedNodeData?.node.id === item.id}
+          usedAdapters={usedAdapters
+            .filter((a) => a.nodeId === item.id)
+            .map((a) => a.adapterNumber)}
         />
       ))}
 
       {/* Debug JSON preview */}
-      <pre className="absolute bottom-0 left-0 bg-black text-white text-xs p-2 max-h-40 overflow-auto">
+      <pre className="absolute bottom-0 left-0 bg-black text-white text-xs p-2 max-h-80 overflow-auto">
         {JSON.stringify(links, null, 2)}
       </pre>
     </div>

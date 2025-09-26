@@ -10,6 +10,7 @@ export type BoxItem = {
   name: string;
   left: number;
   top: number;
+  mouseOffset?: { x: number; y: number };
 };
 
 export type DndItem = SidebarItem | BoxItem;
