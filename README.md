@@ -1,22 +1,16 @@
 # Getting Started
+
 This assumes that you have the docker templates loaded into GNS3
+
 ## Dependencies:
 
-react-dnd (drag and drop) \
-react-dnd-html5-backend (drag and drop) \
 lucide-react (icons)
 
 ## If you don't have pnpm installed:
 
-npm install -g pnpm 
+npm install -g pnpm
 
-pnpm add react-dnd react-dnd-html5-backend \
 pnpm add lucide-react
-
-## Replace Project ID:
-
-MainDropZone.tsx \
-const projectId = {GNS3_PROJECT_ID}
 
 ## Create .env.local file
 

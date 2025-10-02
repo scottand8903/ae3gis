@@ -63,7 +63,7 @@ const TopologyBuilder: React.FC = () => {
       templates,
       selectedProject
     );
-    downloadJSON(scenario, "HYBRID_topology");
+    downloadJSON(scenario);
   };
 
   if (templatesLoading || projectsLoading) {

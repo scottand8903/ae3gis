@@ -1,208 +1,188 @@
 import { DeviceConfig, Node, Link, Template, Project } from "../types/topology";
 
+// Configuration constants
+const LAYOUT_CONFIG = {
+  IT_SWITCH_Y: 100,
+  OT_SWITCH_Y: -150,
+  SWITCH_SPACING: 400,
+  DEVICE_SPACING_X: 120,
+  DEVICE_SPACING_Y: 70,
+  IT_DEVICE_OFFSET_Y: 60,
+  OT_DEVICE_OFFSET_Y: -60,
+  IT_GRID_COLUMNS: 2,
+  OT_GRID_ROWS: 2,
+  BOUNDS: {
+    IT: { X_MIN: -1000, X_MAX: 945, Y_MIN: 50, Y_MAX: 470 },
+    OT: { X_MIN: -1000, X_MAX: 945, Y_MIN: -505, Y_MAX: -50 },
+  },
+} as const;
+
 export const generatePositions = (
   deviceCount: number,
   zone: "IT" | "OT" | "DMZ"
 ) => {
   const positions = [];
-
   if (zone === "DMZ") {
-    // Firewall is always at center
     positions.push({ x: 0, y: 0 });
     return positions;
   }
-
-  // For IT and OT devices, we need to position them hierarchically
-  // This is a placeholder - the actual positioning will be done in generateTopologyJSON
   for (let i = 0; i < deviceCount; i++) {
-    positions.push({ x: 0, y: 0 }); // Temporary positions
+    positions.push({ x: 0, y: 0 });
   }
   return positions;
+};
+
+const positionDevicesInGrid = (
+  devices: Node[],
+  switches: Node[],
+  isITZone: boolean,
+  positionedNodes: Node[]
+) => {
+  if (devices.length === 0 || switches.length === 0) return;
+
+  const devicesPerSwitch = Math.ceil(devices.length / switches.length);
+  const { DEVICE_SPACING_X, DEVICE_SPACING_Y, SWITCH_SPACING } = LAYOUT_CONFIG;
+
+  const gridConfig = isITZone
+    ? {
+        columns: LAYOUT_CONFIG.IT_GRID_COLUMNS,
+        baseY: LAYOUT_CONFIG.IT_SWITCH_Y + LAYOUT_CONFIG.IT_DEVICE_OFFSET_Y,
+      }
+    : {
+        columns: Math.ceil(devicesPerSwitch / LAYOUT_CONFIG.OT_GRID_ROWS),
+        baseY:
+          LAYOUT_CONFIG.OT_SWITCH_Y +
+          LAYOUT_CONFIG.OT_DEVICE_OFFSET_Y -
+          DEVICE_SPACING_Y,
+      };
+
+  devices.forEach((device, index) => {
+    const nodeIndex = positionedNodes.findIndex(
+      (n) => n.node_id === device.node_id
+    );
+    if (nodeIndex === -1) return;
+
+    const switchGroup = Math.floor(index / devicesPerSwitch);
+    const positionInGroup = index % devicesPerSwitch;
+    const row = Math.floor(positionInGroup / gridConfig.columns);
+    const col = positionInGroup % gridConfig.columns;
+
+    const switchX = switches[switchGroup]
+      ? (switchGroup - (switches.length - 1) / 2) * SWITCH_SPACING
+      : 0;
+
+    // Calculate X offset based on switch position
+    const isEdgeSwitch =
+      switches.length > 1 &&
+      (switchGroup === 0 || switchGroup === switches.length - 1);
+    const xOffset = isEdgeSwitch
+      ? (switchGroup === 0 ? -(gridConfig.columns - col) : col + 1) *
+        DEVICE_SPACING_X
+      : (col - (gridConfig.columns - 1) / 2) * DEVICE_SPACING_X;
+
+    const x = switchX + xOffset;
+    const y = gridConfig.baseY + row * DEVICE_SPACING_Y;
+
+    // Apply bounds
+    const bounds = isITZone ? LAYOUT_CONFIG.BOUNDS.IT : LAYOUT_CONFIG.BOUNDS.OT;
+    const clampedX = Math.max(bounds.X_MIN, Math.min(bounds.X_MAX, x));
+    const clampedY = Math.max(bounds.Y_MIN, Math.min(bounds.Y_MAX, y));
+
+    positionedNodes[nodeIndex] = { ...device, x: clampedX, y: clampedY };
+  });
 };
 
 export const calculateHierarchicalPositions = (nodes: Node[]): Node[] => {
   const positionedNodes = [...nodes];
 
-  // Separate nodes by type and zone
-  const firewalls = nodes.filter((n) => n.zone === "DMZ");
-  const itSwitches = nodes.filter(
-    (n) => n.zone === "IT" && n.name.toLowerCase().includes("switch")
-  );
-  const otSwitches = nodes.filter(
-    (n) => n.zone === "OT" && n.name.toLowerCase().includes("switch")
-  );
-  const itDevices = nodes.filter(
-    (n) => n.zone === "IT" && !n.name.toLowerCase().includes("switch")
-  );
-  const otDevices = nodes.filter(
-    (n) => n.zone === "OT" && !n.name.toLowerCase().includes("switch")
-  );
+  // Categorize nodes
+  const nodesByType = {
+    firewalls: nodes.filter((n) => n.zone === "DMZ"),
+    itSwitches: nodes.filter(
+      (n) => n.zone === "IT" && n.name.toLowerCase().includes("switch")
+    ),
+    otSwitches: nodes.filter(
+      (n) => n.zone === "OT" && n.name.toLowerCase().includes("switch")
+    ),
+    itDevices: nodes.filter(
+      (n) => n.zone === "IT" && !n.name.toLowerCase().includes("switch")
+    ),
+    otDevices: nodes.filter(
+      (n) => n.zone === "OT" && !n.name.toLowerCase().includes("switch")
+    ),
+  };
 
-  // Position firewall at center (0, 0)
-  firewalls.forEach((firewall) => {
-    const nodeIndex = positionedNodes.findIndex(
+  // Position firewall at center
+  nodesByType.firewalls.forEach((firewall) => {
+    const idx = positionedNodes.findIndex(
       (n) => n.node_id === firewall.node_id
     );
-    if (nodeIndex !== -1) {
-      positionedNodes[nodeIndex] = { ...firewall, x: 0, y: 0 };
-    }
+    if (idx !== -1) positionedNodes[idx] = { ...firewall, x: 0, y: 0 };
   });
 
-  // Position IT switches (above firewall, Y > 0)
-  const itSwitchY = 100;
-  const switchSpacing = 400;
-  itSwitches.forEach((itSwitch, index) => {
-    const nodeIndex = positionedNodes.findIndex(
-      (n) => n.node_id === itSwitch.node_id
-    );
-    if (nodeIndex !== -1) {
-      const x = (index - (itSwitches.length - 1) / 2) * switchSpacing;
-      positionedNodes[nodeIndex] = { ...itSwitch, x, y: itSwitchY };
-    }
-  });
-
-  // Position OT switches (below firewall, Y < 0)
-  const otSwitchY = -150;
-  otSwitches.forEach((otSwitch, index) => {
-    const nodeIndex = positionedNodes.findIndex(
-      (n) => n.node_id === otSwitch.node_id
-    );
-    if (nodeIndex !== -1) {
-      const x = (index - (otSwitches.length - 1) / 2) * switchSpacing;
-      positionedNodes[nodeIndex] = { ...otSwitch, x, y: otSwitchY };
-    }
-  });
-
-  // Position IT devices in grids (taller than wide)
-  if (itDevices.length > 0 && itSwitches.length > 0) {
-    const devicesPerSwitch = Math.ceil(itDevices.length / itSwitches.length);
-    const deviceSpacingX = 120; // Horizontal spacing between devices
-    const deviceSpacingY = 70; // Vertical spacing between devices
-    const itDeviceStartY = itSwitchY + 60; // Starting Y position for IT devices (above switches)
-
-    // Calculate grid dimensions (taller than wide - 2 columns max)
-    const gridColumns = 2;
-    const gridRows = Math.ceil(devicesPerSwitch / gridColumns);
-
-    itDevices.forEach((device, index) => {
-      const nodeIndex = positionedNodes.findIndex(
-        (n) => n.node_id === device.node_id
-      );
-      if (nodeIndex !== -1) {
-        // Determine which switch group this device belongs to
-        const switchGroup = Math.floor(index / devicesPerSwitch);
-        const positionInGroup = index % devicesPerSwitch;
-
-        // Calculate row and column in the grid
-        const row = Math.floor(positionInGroup / gridColumns);
-        const col = positionInGroup % gridColumns;
-
-        // Get the switch X position for this group
-        const switchX = itSwitches[switchGroup]
-          ? (switchGroup - (itSwitches.length - 1) / 2) * switchSpacing
-          : 0;
-
-        // Determine if this is the leftmost or rightmost switch
-        const isLeftSwitch = switchGroup === 0 && itSwitches.length > 1;
-        const isRightSwitch =
-          switchGroup === itSwitches.length - 1 && itSwitches.length > 1;
-        const isSingleSwitch = itSwitches.length === 1;
-
-        let x, y;
-
-        if (isLeftSwitch) {
-          // Left switch: grid to the left (negative X offset)
-          x = switchX - (gridColumns - col) * deviceSpacingX;
-          y = itDeviceStartY + row * deviceSpacingY;
-        } else if (isRightSwitch) {
-          // Right switch: grid to the right (positive X offset)
-          x = switchX + (col + 1) * deviceSpacingX;
-          y = itDeviceStartY + row * deviceSpacingY;
-        } else {
-          // Middle switch or single switch: centered above
-          x = switchX + (col - (gridColumns - 1) / 2) * deviceSpacingX;
-          y = itDeviceStartY + row * deviceSpacingY;
-        }
-
-        // Ensure within bounds
-        const clampedX = Math.max(-1000, Math.min(945, x));
-        const clampedY = Math.max(50, Math.min(470, y));
-
-        positionedNodes[nodeIndex] = { ...device, x: clampedX, y: clampedY };
+  // Position switches
+  const positionSwitches = (switches: Node[], yPos: number) => {
+    switches.forEach((sw, index) => {
+      const idx = positionedNodes.findIndex((n) => n.node_id === sw.node_id);
+      if (idx !== -1) {
+        const x =
+          (index - (switches.length - 1) / 2) * LAYOUT_CONFIG.SWITCH_SPACING;
+        positionedNodes[idx] = { ...sw, x, y: yPos };
       }
     });
-  }
+  };
 
-  // Position OT devices in grids (two rows, wider than tall)
-  if (otDevices.length > 0 && otSwitches.length > 0) {
-    const devicesPerSwitch = Math.ceil(otDevices.length / otSwitches.length);
-    const deviceSpacingX = 120; // Horizontal spacing between devices
-    const deviceSpacingY = 70; // Vertical spacing between devices
+  positionSwitches(nodesByType.itSwitches, LAYOUT_CONFIG.IT_SWITCH_Y);
+  positionSwitches(nodesByType.otSwitches, LAYOUT_CONFIG.OT_SWITCH_Y);
 
-    // Calculate grid dimensions (two rows, horizontal layout)
-    const gridRows = 2;
-    const gridColumns = Math.ceil(devicesPerSwitch / gridRows);
-
-    // Start from more negative Y and work towards 0
-    const otDeviceStartY = otSwitchY - 60 - deviceSpacingY;
-
-    otDevices.forEach((device, index) => {
-      const nodeIndex = positionedNodes.findIndex(
-        (n) => n.node_id === device.node_id
-      );
-      if (nodeIndex !== -1) {
-        // Determine which switch group this device belongs to
-        const switchGroup = Math.floor(index / devicesPerSwitch);
-        const positionInGroup = index % devicesPerSwitch;
-
-        // Calculate row and column in the grid (fill row by row)
-        const row = Math.floor(positionInGroup / gridColumns);
-        const col = positionInGroup % gridColumns;
-
-        // Get the switch X position for this group
-        const switchX = otSwitches[switchGroup]
-          ? (switchGroup - (otSwitches.length - 1) / 2) * switchSpacing
-          : 0;
-
-        // Determine if this is the leftmost or rightmost switch
-        const isLeftSwitch = switchGroup === 0 && otSwitches.length > 1;
-        const isRightSwitch =
-          switchGroup === otSwitches.length - 1 && otSwitches.length > 1;
-        const isSingleSwitch = otSwitches.length === 1;
-
-        let x, y;
-
-        if (isLeftSwitch) {
-          // Left switch: grid to the left (negative X offset)
-          x = switchX - (gridColumns - col) * deviceSpacingX;
-          y = otDeviceStartY + row * deviceSpacingY; // Start from bottom, work up
-        } else if (isRightSwitch) {
-          // Right switch: grid to the right (positive X offset)
-          x = switchX + (col + 1) * deviceSpacingX;
-          y = otDeviceStartY + row * deviceSpacingY; // Start from bottom, work up
-        } else {
-          // Middle switch or single switch: centered below
-          x = switchX + (col - (gridColumns - 1) / 2) * deviceSpacingX;
-          y = otDeviceStartY + row * deviceSpacingY; // Start from bottom, work up
-        }
-
-        // Ensure within bounds
-        const clampedX = Math.max(-1000, Math.min(945, x));
-        const clampedY = Math.max(-505, Math.min(-50, y));
-
-        positionedNodes[nodeIndex] = { ...device, x: clampedX, y: clampedY };
-      }
-    });
-  }
+  // Position devices
+  positionDevicesInGrid(
+    nodesByType.itDevices,
+    nodesByType.itSwitches,
+    true,
+    positionedNodes
+  );
+  positionDevicesInGrid(
+    nodesByType.otDevices,
+    nodesByType.otSwitches,
+    false,
+    positionedNodes
+  );
 
   return positionedNodes;
 };
 
+const connectDevicesToSwitches = (
+  devices: Node[],
+  switches: Node[],
+  links: Link[]
+) => {
+  if (switches.length === 0) return;
+
+  const devicesPerSwitch = Math.ceil(devices.length / switches.length);
+
+  devices.forEach((device, index) => {
+    const switchIndex = Math.floor(index / devicesPerSwitch);
+    const targetSwitch = switches[Math.min(switchIndex, switches.length - 1)];
+    const portOnSwitch = (index % devicesPerSwitch) + 1;
+
+    links.push({
+      nodes: [
+        { node_id: device.node_id, adapter_number: 0, port_number: 0 },
+        {
+          node_id: targetSwitch.node_id,
+          adapter_number: portOnSwitch,
+          port_number: 0,
+        },
+      ],
+    });
+  });
+};
+
 export const generateBasicLinks = (nodes: Node[]): Link[] => {
   const links: Link[] = [];
-  const PORTS_PER_SWITCH = 13;
 
-  // Separate nodes by zone and type
+  // Categorize nodes
   const itSwitches = nodes.filter(
     (n) => n.zone === "IT" && n.name.toLowerCase().includes("switch")
   );
@@ -212,102 +192,26 @@ export const generateBasicLinks = (nodes: Node[]): Link[] => {
   const firewalls = nodes.filter(
     (n) => n.zone === "DMZ" && n.name.toLowerCase().includes("firewall")
   );
-
-  // IT devices (excluding switches)
   const itDevices = nodes.filter(
     (n) => n.zone === "IT" && !n.name.toLowerCase().includes("switch")
   );
-
-  // OT devices (excluding switches)
   const otDevices = nodes.filter(
     (n) => n.zone === "OT" && !n.name.toLowerCase().includes("switch")
   );
 
-  // Connect IT devices to IT switches - evenly distributed
-  if (itSwitches.length > 0) {
-    const devicesPerSwitch = Math.ceil(itDevices.length / itSwitches.length);
+  // Connect devices to switches
+  connectDevicesToSwitches(itDevices, itSwitches, links);
+  connectDevicesToSwitches(otDevices, otSwitches, links);
 
-    itDevices.forEach((device, index) => {
-      // Calculate which switch based on even distribution
-      const switchIndex = Math.floor(index / devicesPerSwitch);
-      const targetSwitch =
-        itSwitches[Math.min(switchIndex, itSwitches.length - 1)];
-
-      // Calculate the port on this specific switch (1-14)
-      const portOnSwitch = (index % devicesPerSwitch) + 1;
-
-      links.push({
-        nodes: [
-          { node_id: device.node_id, adapter_number: 0, port_number: 0 },
-          {
-            node_id: targetSwitch.node_id,
-            adapter_number: portOnSwitch,
-            port_number: 0,
-          },
-        ],
-      });
-    });
-  }
-
-  // Connect OT devices to OT switches - evenly distributed
-  if (otSwitches.length > 0) {
-    const devicesPerSwitch = Math.ceil(otDevices.length / otSwitches.length);
-
-    otDevices.forEach((device, index) => {
-      // Calculate which switch based on even distribution
-      const switchIndex = Math.floor(index / devicesPerSwitch);
-      const targetSwitch =
-        otSwitches[Math.min(switchIndex, otSwitches.length - 1)];
-
-      // Calculate the port on this specific switch (1-14)
-      const portOnSwitch = (index % devicesPerSwitch) + 1;
-
-      links.push({
-        nodes: [
-          { node_id: device.node_id, adapter_number: 0, port_number: 0 },
-          {
-            node_id: targetSwitch.node_id,
-            adapter_number: portOnSwitch,
-            port_number: 0,
-          },
-        ],
-      });
-    });
-  }
-
-  // Connect all switches to firewall(s)
+  // Connect all switches to firewall
   if (firewalls.length > 0) {
-    const firewall = firewalls[0]; // Use first firewall
+    const firewall = firewalls[0];
     let firewallPort = 0;
 
-    // Connect IT switches to firewall
-    itSwitches.forEach((itSwitch) => {
+    [...itSwitches, ...otSwitches].forEach((sw) => {
       links.push({
         nodes: [
-          {
-            node_id: itSwitch.node_id,
-            adapter_number: 0, // Use port 0 as uplink port
-            port_number: 0,
-          },
-          {
-            node_id: firewall.node_id,
-            adapter_number: firewallPort,
-            port_number: 0,
-          },
-        ],
-      });
-      firewallPort++;
-    });
-
-    // Connect OT switches to firewall
-    otSwitches.forEach((otSwitch) => {
-      links.push({
-        nodes: [
-          {
-            node_id: otSwitch.node_id,
-            adapter_number: 0, // Use port 0 as uplink port
-            port_number: 0,
-          },
+          { node_id: sw.node_id, adapter_number: 0, port_number: 0 },
           {
             node_id: firewall.node_id,
             adapter_number: firewallPort,
@@ -330,16 +234,15 @@ export const generateTopologyJSON = (
   selectedProject: Project | null
 ) => {
   const nodes: Node[] = [];
-  const links: Link[] = [];
-  let nodeId = 1;
 
-  // Extract GNS3 server IP from environment variable
+  // Extract GNS3 server IP
   const gns3Url =
     process.env.NEXT_PUBLIC_GNS3_URL || "http://192.168.56.102:80/v2";
   const gns3ServerIp = gns3Url
     .replace(/^https?:\/\//, "")
     .replace(/:\d+.*$/, "");
 
+  // Helper to add devices
   const addDevices = (devices: DeviceConfig[], zone: "IT" | "OT") => {
     devices.forEach((device) => {
       if (device.count > 0) {
@@ -348,20 +251,17 @@ export const generateTopologyJSON = (
             node_id: `${device.name}_${i + 1}`,
             name: `${device.name}_${i + 1}`,
             template_id: device.templateId,
-            x: 0, // Temporary position - will be calculated later
-            y: 0, // Temporary position - will be calculated later
+            x: 0,
+            y: 0,
             zone: zone,
           });
-          nodeId++;
         }
       }
     });
   };
 
-  // Add IT devices
+  // Add all devices
   addDevices(itDevices, "IT");
-
-  // Add OT devices
   addDevices(otDevices, "OT");
 
   // Add firewall
@@ -371,49 +271,43 @@ export const generateTopologyJSON = (
         node_id: `Firewall_${i + 1}`,
         name: `Firewall_${i + 1}`,
         template_id: firewallConfig.templateId,
-        x: 0, // Will be positioned at center
-        y: 0, // Will be positioned at center
+        x: 0,
+        y: 0,
         zone: "DMZ",
       });
     }
   }
 
-  // Calculate hierarchical positions for all nodes
+  // Calculate positions and generate links
   const positionedNodes = calculateHierarchicalPositions(nodes);
+  const links = generateBasicLinks(positionedNodes);
 
-  // Generate links with the positioned nodes
-  const generatedLinks = generateBasicLinks(positionedNodes);
-  links.push(...generatedLinks);
-
-  // Build templates object from current templates
+  // Build templates object
   const templatesObj: Record<string, string> = {};
   templates.forEach((template) => {
     templatesObj[template.name] = template.template_id;
   });
 
-  const scenario = {
+  return {
     gns3_server_ip: gns3ServerIp,
-    project_name: selectedProject?.name || "ae3gis",
-    project_id:
-      selectedProject?.project_id || "391a9fde-246c-4473-9024-202ff316c48a",
+    project_name: selectedProject?.name,
+    project_id: selectedProject?.project_id,
     templates: templatesObj,
     topology_type: "HYBRID",
     created_at: new Date().toISOString(),
-    nodes: positionedNodes, // Use positioned nodes instead of original nodes
+    nodes: positionedNodes,
     links,
   };
-
-  return scenario;
 };
 
-export const downloadJSON = (jsonData: any, filename: string = "topology") => {
+export const downloadJSON = (jsonData: any) => {
   const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${filename}_${new Date().getTime()}.json`;
+  a.download = `scenario.json`;
   a.click();
   URL.revokeObjectURL(url);
 };
