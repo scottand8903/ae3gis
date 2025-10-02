@@ -68,9 +68,9 @@ const TopologyBuilder: React.FC = () => {
 
   if (templatesLoading || projectsLoading) {
     return (
-      <div className="max-w-6xl mx-auto p-6 bg-white">
+      <div className="max-w-6xl mx-auto p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="text-gray-600">Loading...</div>
+          <div className="text-gray-300">Loading...</div>
         </div>
       </div>
     );
@@ -78,9 +78,9 @@ const TopologyBuilder: React.FC = () => {
 
   if (templatesError || projectsError) {
     return (
-      <div className="max-w-6xl mx-auto p-6 bg-white">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="text-red-700">
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
+          <div className="text-red-400">
             Error: {templatesError || projectsError}
           </div>
         </div>
@@ -89,23 +89,23 @@ const TopologyBuilder: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white">
+    <div className="max-w-6xl mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <h1 className="text-3xl font-bold text-gray-100 mb-2">
           Network Topology Builder
         </h1>
-        <p className="text-gray-600">
+        <p className="text-gray-400">
           Configure and generate GNS3 network topologies
         </p>
       </div>
 
       {/* Project Selection */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+      <div className="mb-8 bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
+        <h2 className="text-xl font-semibold text-gray-100 mb-4">
           Project Selection
         </h2>
         <div className="flex items-center space-x-4">
-          <label className="text-sm font-medium text-gray-700">
+          <label className="text-sm font-medium text-gray-300">
             Select Project:
           </label>
           <select
@@ -116,11 +116,17 @@ const TopologyBuilder: React.FC = () => {
               );
               setSelectedProject(project || null);
             }}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-2 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           >
-            <option value="">-- Select a Project --</option>
+            <option value="" className="bg-[#252535]">
+              -- Select a Project --
+            </option>
             {projects.map((project) => (
-              <option key={project.project_id} value={project.project_id}>
+              <option
+                key={project.project_id}
+                value={project.project_id}
+                className="bg-[#252535]"
+              >
                 {project.name}
               </option>
             ))}
@@ -132,7 +138,7 @@ const TopologyBuilder: React.FC = () => {
       <div className="mb-6">
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
+          className="flex items-center space-x-2 text-indigo-400 hover:text-indigo-300 transition-colors"
         >
           {showAdvanced ? (
             <ChevronUp className="w-4 h-4" />
@@ -145,9 +151,9 @@ const TopologyBuilder: React.FC = () => {
 
       {/* Device Configuration */}
       <div className="space-y-8">
-        <div>
+        <div className="bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-gray-100">
               IT Network Devices
             </h2>
             <AddDeviceButton
@@ -174,9 +180,9 @@ const TopologyBuilder: React.FC = () => {
           </div>
         </div>
 
-        <div>
+        <div className="bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-gray-100">
               OT Network Devices
             </h2>
             <AddDeviceButton
@@ -203,25 +209,25 @@ const TopologyBuilder: React.FC = () => {
           </div>
         </div>
 
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
+          <h2 className="text-xl font-semibold text-gray-100 mb-4">
             Security Infrastructure
           </h2>
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-[#333347] rounded-lg border border-[#3a3a4e]">
             <div className="flex items-center space-x-3">
-              <Shield className="w-5 h-5" />
+              <Shield className="w-5 h-5 text-indigo-400" />
               <div>
-                <h4 className="font-medium text-gray-900">
+                <h4 className="font-medium text-gray-100">
                   {firewallConfig.name}
                 </h4>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-400">
                   {firewallConfig.description}
                 </p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-gray-300">
                   Count:
                 </label>
                 <input
@@ -235,12 +241,12 @@ const TopologyBuilder: React.FC = () => {
                       count: parseInt(e.target.value) || 0,
                     }))
                   }
-                  className="w-16 px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-16 px-2 py-1 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               {showAdvanced && (
                 <div className="flex items-center space-x-2">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-gray-300">
                     Template:
                   </label>
                   <select
@@ -251,12 +257,13 @@ const TopologyBuilder: React.FC = () => {
                         templateId: e.target.value,
                       }))
                     }
-                    className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="px-3 py-1 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     {templates.map((template) => (
                       <option
                         key={template.template_id}
                         value={template.template_id}
+                        className="bg-[#252535]"
                       >
                         {template.name}
                       </option>
@@ -273,7 +280,7 @@ const TopologyBuilder: React.FC = () => {
       <div className="mt-8 flex justify-center">
         <button
           onClick={handleDownloadJSON}
-          className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
         >
           Generate & Download Topology JSON
         </button>
@@ -281,11 +288,11 @@ const TopologyBuilder: React.FC = () => {
 
       {/* Preview */}
       <div className="mt-8">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">
           Topology Preview
         </h3>
-        <div className="bg-gray-100 rounded-lg p-6">
-          <div className="text-center text-gray-600">
+        <div className="bg-[#2a2a3e] border border-[#3a3a4e] rounded-lg p-6">
+          <div className="text-center text-gray-300">
             IT/OT Network with {itDevices.reduce((sum, d) => sum + d.count, 0)}{" "}
             IT devices, {otDevices.reduce((sum, d) => sum + d.count, 0)} OT
             devices, and {firewallConfig.count} firewall
