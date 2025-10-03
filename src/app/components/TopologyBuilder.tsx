@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp, Shield } from "lucide-react";
+import { ChevronDown, ChevronUp, Shield, Settings } from "lucide-react";
 
 // Hooks
 import { useTemplates } from "../hooks/useTemplates";
 import { useProjects } from "../hooks/useProjects";
 import { useTopologyConfig } from "../hooks/useTopologyConfig";
 import { useScenarios } from "../hooks/useScenarios";
+import { useBuildScenario } from "../hooks/useBuild";
 
 // Components
 import { DeviceConfigRow } from "./DeviceConfigRow";
@@ -15,6 +16,7 @@ import { ScenarioListItem } from "./ScenarioListItem";
 
 // Types
 import { Scenario } from "../lib/db";
+import { IpInput } from "./IpInput";
 
 // Constants
 import {
@@ -27,6 +29,11 @@ import { generateTopologyJSON, downloadJSON } from "../utils/topologyGenerator";
 
 const TopologyBuilder: React.FC = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [currentGns3Ip, setCurrentGns3Ip] = useState<string>(
+  process.env.NEXT_PUBLIC_GNS3_IP || ""
+);
+  const [isServerConnected, setIsServerConnected] = useState(false);
 
   // Custom hooks
   const {
@@ -55,6 +62,8 @@ const TopologyBuilder: React.FC = () => {
   } = useTopologyConfig(templates);
 
   const { scenarios, deleteScenario } = useScenarios();
+  const { buildScenario, loading: buildLoading, error: buildError, result } = useBuildScenario();
+
 
   // Initialize template IDs when templates are loaded
   useEffect(() => {
@@ -65,6 +74,7 @@ const TopologyBuilder: React.FC = () => {
 
   const handleDownloadJSON = () => {
     const scenario = generateTopologyJSON(
+      currentGns3Ip,
       itDevices,
       otDevices,
       firewallConfig,
@@ -121,6 +131,19 @@ const TopologyBuilder: React.FC = () => {
 
   const handleExportScenario = (scenario: Scenario) => {
     downloadJSON(scenario.topology_data);
+  const handleBuildJSON = async () => {
+    console.log("GNS3 IP:", currentGns3Ip);
+    const scenario = generateTopologyJSON(
+      currentGns3Ip,
+      itDevices,
+      otDevices,
+      firewallConfig,
+      templates,
+      selectedProject
+    );
+      const response = await buildScenario(scenario, currentGns3Ip, true);
+
+      console.log("Build Scenario response:", response);
   };
 
   if (templatesLoading || projectsLoading) {
@@ -156,6 +179,32 @@ const TopologyBuilder: React.FC = () => {
         </p>
       </div>
 
+      {/* Server Configuration Toggle */}
+      <div className="mb-6">
+        <button
+          onClick={() => setShowServerConfig(!showServerConfig)}
+          className="flex items-center space-x-2 text-indigo-400 hover:text-indigo-300 transition-colors"
+        >
+          <Settings className="w-4 h-4" />
+          <span>Server Configuration</span>
+          {showServerConfig ? (
+            <ChevronUp className="w-4 h-4" />
+          ) : (
+            <ChevronDown className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+
+      {/* Server Configuration Section */}
+      {showServerConfig && (
+        <div className="mb-8">
+          {<IpInput 
+            onIpChange={setCurrentGns3Ip}
+            onValidConnection={setIsServerConnected}
+          />}
+        </div>
+      )}
+
       {/* Project Selection */}
       <div className="mb-8 bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
         <h2 className="text-xl font-semibold text-gray-100 mb-4">
@@ -188,6 +237,9 @@ const TopologyBuilder: React.FC = () => {
               </option>
             ))}
           </select>
+          {isServerConnected && (
+            <span className="text-green-400 text-sm">✓ Connected</span>
+          )}
         </div>
       </div>
 
@@ -339,7 +391,17 @@ const TopologyBuilder: React.FC = () => {
           onClick={handleDownloadJSON}
           className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
         >
-          Generate & Download Topology JSON
+          Download Topology JSON
+        </button>
+      </div>
+
+      {/* Generate Button */}
+      <div className="mt-8 flex justify-center">
+        <button
+          onClick={handleBuildJSON}
+          className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
+        >
+          Build and Send Topology to GNS3 Server
         </button>
 
         <SaveScenarioForm

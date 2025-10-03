@@ -110,21 +110,21 @@ export const defaultItDevices: DeviceConfig[] = [
     description: "Network switches",
   },
   {
-    name: "DHCP Server",
+    name: "DHCP_Server",
     count: 1,
     templateId: "",
     icon: <Server className="w-5 h-5" />,
     description: "Dynamic IP assignment",
   },
   {
-    name: "Web Server",
+    name: "Web_Server",
     count: 1,
     templateId: "",
     icon: <Server className="w-5 h-5" />,
     description: "HTTP/HTTPS services",
   },
   {
-    name: "DNS Server",
+    name: "DNS_Server",
     count: 1,
     templateId: "",
     icon: <Database className="w-5 h-5" />,
@@ -148,7 +148,7 @@ export const defaultOtDevices: DeviceConfig[] = [
     description: "Industrial control systems",
   },
   {
-    name: "Industrial Switch",
+    name: "Industrial+Switch",
     count: 1,
     templateId: "",
     icon: <Network className="w-5 h-5" />,
