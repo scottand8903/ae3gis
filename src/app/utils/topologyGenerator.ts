@@ -227,6 +227,7 @@ export const generateBasicLinks = (nodes: Node[]): Link[] => {
 };
 
 export const generateTopologyJSON = (
+  currentIP: string,
   itDevices: DeviceConfig[],
   otDevices: DeviceConfig[],
   firewallConfig: DeviceConfig,
@@ -237,7 +238,7 @@ export const generateTopologyJSON = (
 
   // Extract GNS3 server IP
   const gns3Url =
-    process.env.NEXT_PUBLIC_GNS3_URL || "http://192.168.56.102:80/v2";
+    currentIP;
   const gns3ServerIp = gns3Url
     .replace(/^https?:\/\//, "")
     .replace(/:\d+.*$/, "");
@@ -299,6 +300,7 @@ export const generateTopologyJSON = (
     links,
   };
 };
+
 
 export const downloadJSON = (jsonData: any) => {
   const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
