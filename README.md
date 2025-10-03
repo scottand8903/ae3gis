@@ -15,6 +15,8 @@ pnpm add lucide-react
 ## Create .env.local file
 
 GNS3_URL=http://{IP_ADDRESS}:{PORT_NUMBER}/v2
+AE3GIS_URL=http://{IP of AE3GIS API}:{PORT}
+NEXT_PUBLIC_GNS3_IP={IP Address of GNS3 Server}
 
 ## First, run the development server:
 
