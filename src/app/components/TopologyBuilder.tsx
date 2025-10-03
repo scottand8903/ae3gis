@@ -5,11 +5,17 @@ import { ChevronDown, ChevronUp, Shield, Settings } from "lucide-react";
 import { useTemplates } from "../hooks/useTemplates";
 import { useProjects } from "../hooks/useProjects";
 import { useTopologyConfig } from "../hooks/useTopologyConfig";
+import { useScenarios } from "../hooks/useScenarios";
 import { useBuildScenario } from "../hooks/useBuild";
 
 // Components
 import { DeviceConfigRow } from "./DeviceConfigRow";
 import { AddDeviceButton } from "./AddDeviceButton";
+import { SaveScenarioForm } from "./SaveScenarioForm";
+import { ScenarioListItem } from "./ScenarioListItem";
+
+// Types
+import { Scenario } from "../lib/db";
 import { IpInput } from "./IpInput";
 
 // Constants
@@ -55,6 +61,7 @@ const TopologyBuilder: React.FC = () => {
     addDevice,
   } = useTopologyConfig(templates);
 
+  const { scenarios, deleteScenario } = useScenarios();
   const { buildScenario, loading: buildLoading, error: buildError, result } = useBuildScenario();
 
 
@@ -77,6 +84,53 @@ const TopologyBuilder: React.FC = () => {
     downloadJSON(scenario);
   };
 
+  const handleLoadScenario = (scenario: Scenario) => {
+    const confirmed = window.confirm(
+      `Load scenario "${scenario.name}"? This will replace your current configuration.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // Extract data from the saved scenario
+      const topologyData = scenario.topology_data;
+
+      // TODO: You'll need to implement this based on how your data is structured
+      // For now, just log it so you can see the structure
+      console.log("Loading scenario data:", topologyData);
+
+      alert(
+        `Loaded scenario: ${scenario.name}\n\nNote: You need to implement the loading logic to restore device counts and configuration.`
+      );
+
+      // Example of what you might do:
+      // 1. Parse topologyData.nodes to extract device counts
+      // 2. Update your state with those values
+      // 3. Set the project if it's in the data
+    } catch (err) {
+      console.error("Failed to load scenario:", err);
+      alert("Failed to load scenario.");
+    }
+  };
+
+  const handleDeleteScenario = async (id: number, name: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${name}"? This cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteScenario(id);
+      alert("Scenario deleted successfully!");
+    } catch (err) {
+      console.error("Failed to delete scenario:", err);
+      alert("Failed to delete scenario. Please try again.");
+    }
+  };
+
+  const handleExportScenario = (scenario: Scenario) => {
+    downloadJSON(scenario.topology_data);
   const handleBuildJSON = async () => {
     console.log("GNS3 IP:", currentGns3Ip);
     const scenario = generateTopologyJSON(
@@ -331,8 +385,8 @@ const TopologyBuilder: React.FC = () => {
         </div>
       </div>
 
-      {/* Generate Button */}
-      <div className="mt-8 flex justify-center">
+      {/* Generate & Save Buttons */}
+      <div className="mt-8 flex justify-center gap-4">
         <button
           onClick={handleDownloadJSON}
           className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
@@ -349,6 +403,39 @@ const TopologyBuilder: React.FC = () => {
         >
           Build and Send Topology to GNS3 Server
         </button>
+
+        <SaveScenarioForm
+          itDevices={itDevices}
+          otDevices={otDevices}
+          firewallConfig={firewallConfig}
+          templates={templates}
+          selectedProject={selectedProject}
+        />
+      </div>
+
+      {/* Saved Scenarios List */}
+      <div className="mt-8 bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">
+          Saved Scenarios {scenarios && `(${scenarios.length})`}
+        </h3>
+
+        {!scenarios || scenarios.length === 0 ? (
+          <p className="text-gray-400 text-center py-8">
+            No saved scenarios yet. Save your first configuration above!
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {scenarios.map((scenario) => (
+              <ScenarioListItem
+                key={scenario.id}
+                scenario={scenario}
+                onLoad={handleLoadScenario}
+                onExport={handleExportScenario}
+                onDelete={handleDeleteScenario}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Preview */}

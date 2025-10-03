@@ -5,12 +5,15 @@ This assumes that you have the docker templates loaded into GNS3
 ## Dependencies:
 
 lucide-react (icons)
+dexie
+dexie-react-hooks
 
 ## If you don't have pnpm installed:
 
 npm install -g pnpm
 
 pnpm add lucide-react
+nom install dexie dexie-react-hooks
 
 ## Create .env.local file
 
