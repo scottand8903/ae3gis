@@ -131,6 +131,8 @@ const TopologyBuilder: React.FC = () => {
 
   const handleExportScenario = (scenario: Scenario) => {
     downloadJSON(scenario.topology_data);
+  };
+
   const handleBuildJSON = async () => {
     console.log("GNS3 IP:", currentGns3Ip);
     const scenario = generateTopologyJSON(
@@ -405,6 +407,7 @@ const TopologyBuilder: React.FC = () => {
         </button>
 
         <SaveScenarioForm
+          currentGns3Ip={currentGns3Ip}
           itDevices={itDevices}
           otDevices={otDevices}
           firewallConfig={firewallConfig}

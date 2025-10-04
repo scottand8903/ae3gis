@@ -148,7 +148,7 @@ export const defaultOtDevices: DeviceConfig[] = [
     description: "Industrial control systems",
   },
   {
-    name: "Industrial+Switch",
+    name: "Industrial_Switch",
     count: 1,
     templateId: "",
     icon: <Network className="w-5 h-5" />,

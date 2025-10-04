@@ -13,20 +13,37 @@ export const useTopologyConfig = (templates: Template[]) => {
     defaultFirewallConfig
   );
 
+  // SCOTT TEMPLATE NAMES
   // Template mapping for specific device types
   const getTemplateId = (deviceName: string): string => {
     const templateMap: Record<string, string> = {
-      Workstations: "tollan-benign-client",
-      Workstation: "tollan-benign-client",
-      Switches: "tollan-openvswitch-xp",
-      Switch: "tollan-openvswitch-xp",
-      "DHCP Server": "tollan-isc-dhcp-server",
-      "Web Server": "tollan-apache-server",
-      PLC: "tollan-tollan-malicious-client",
-      HMI: "tollan-malicious-client",
-      "Industrial Switch": "tollan-openvswitch-xp",
-      Firewall: "tollan-iptables",
+      Workstations: "benign-client",
+      // Workstation: "benign-client",
+      Switches: "openvswitch-xp",
+      // Switch: "openvswitch-xp",
+      DHCP_Server: "isc-dhcp-server",
+      Web_Server: "apache-server",
+      PLC: "malicious-client",
+      HMI: "malicious-client",
+      Industrial_Switch: "openvswitch-xp",
+      Firewall: "iptables",
     };
+
+    // BRAXTON TEMPLATE NAMES
+    //     // Template mapping for specific device types
+    // const getTemplateId = (deviceName: string): string => {
+    //   const templateMap: Record<string, string> = {
+    //     Workstations: "tollan-benign-client",
+    //     Workstation: "tollan-benign-client",
+    //     Switches: "tollan-openvswitch-xp",
+    //     Switch: "tollan-openvswitch-xp",
+    //     "DHCP Server": "tollan-isc-dhcp-server",
+    //     "Web Server": "tollan-apache-server",
+    //     PLC: "tollan-tollan-malicious-client",
+    //     HMI: "tollan-malicious-client",
+    //     "Industrial Switch": "tollan-openvswitch-xp",
+    //     Firewall: "tollan-iptables",
+    //   };
 
     const templateName = templateMap[deviceName];
     if (templateName) {

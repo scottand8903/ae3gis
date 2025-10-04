@@ -237,8 +237,7 @@ export const generateTopologyJSON = (
   const nodes: Node[] = [];
 
   // Extract GNS3 server IP
-  const gns3Url =
-    currentIP;
+  const gns3Url = currentIP;
   const gns3ServerIp = gns3Url
     .replace(/^https?:\/\//, "")
     .replace(/:\d+.*$/, "");
@@ -300,7 +299,6 @@ export const generateTopologyJSON = (
     links,
   };
 };
-
 
 export const downloadJSON = (jsonData: any) => {
   const blob = new Blob([JSON.stringify(jsonData, null, 2)], {

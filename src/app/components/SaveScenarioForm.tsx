@@ -4,6 +4,7 @@ import { DeviceConfig, Template, Project } from "../types/topology";
 import { generateTopologyJSON } from "../utils/topologyGenerator";
 
 interface SaveScenarioFormProps {
+  currentGns3Ip: string;
   itDevices: DeviceConfig[];
   otDevices: DeviceConfig[];
   firewallConfig: DeviceConfig;
@@ -13,6 +14,7 @@ interface SaveScenarioFormProps {
 }
 
 export const SaveScenarioForm: React.FC<SaveScenarioFormProps> = ({
+  currentGns3Ip,
   itDevices,
   otDevices,
   firewallConfig,
@@ -34,6 +36,7 @@ export const SaveScenarioForm: React.FC<SaveScenarioFormProps> = ({
 
     try {
       const scenario = generateTopologyJSON(
+        currentGns3Ip,
         itDevices,
         otDevices,
         firewallConfig,
