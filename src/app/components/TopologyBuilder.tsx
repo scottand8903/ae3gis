@@ -31,8 +31,8 @@ const TopologyBuilder: React.FC = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showServerConfig, setShowServerConfig] = useState(false);
   const [currentGns3Ip, setCurrentGns3Ip] = useState<string>(
-  process.env.NEXT_PUBLIC_GNS3_IP || ""
-);
+    process.env.NEXT_PUBLIC_GNS3_IP || ""
+  );
   const [isServerConnected, setIsServerConnected] = useState(false);
 
   // Custom hooks
@@ -62,8 +62,12 @@ const TopologyBuilder: React.FC = () => {
   } = useTopologyConfig(templates);
 
   const { scenarios, deleteScenario } = useScenarios();
-  const { buildScenario, loading: buildLoading, error: buildError, result } = useBuildScenario();
-
+  const {
+    buildScenario,
+    loading: buildLoading,
+    error: buildError,
+    result,
+  } = useBuildScenario();
 
   // Initialize template IDs when templates are loaded
   useEffect(() => {
@@ -92,24 +96,79 @@ const TopologyBuilder: React.FC = () => {
     if (!confirmed) return;
 
     try {
-      // Extract data from the saved scenario
       const topologyData = scenario.topology_data;
 
-      // TODO: You'll need to implement this based on how your data is structured
-      // For now, just log it so you can see the structure
-      console.log("Loading scenario data:", topologyData);
+      // Set GNS3 IP if available
+      if (topologyData.gns3_server_ip) {
+        setCurrentGns3Ip(topologyData.gns3_server_ip);
+      }
 
-      alert(
-        `Loaded scenario: ${scenario.name}\n\nNote: You need to implement the loading logic to restore device counts and configuration.`
+      // Set project if available
+      if (topologyData.project_id) {
+        const project = projects.find(
+          (p) => p.project_id === topologyData.project_id
+        );
+        if (project) {
+          setSelectedProject(project);
+        }
+      }
+
+      // Count devices by type and zone
+      const deviceCounts = topologyData.nodes.reduce((acc: any, node: any) => {
+        // Extract device type from node name (e.g., "Workstations_1" -> "Workstations")
+        const deviceType = node.name.replace(/_\d+$/, "");
+        const key = `${node.zone}-${deviceType}`;
+
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Update IT devices
+      itDevices.forEach((device) => {
+        const count = deviceCounts[`IT-${device.name}`] || 0;
+        updateDeviceCount(device.name, count, true);
+
+        // Update template if found in topology data
+        const nodeWithType = topologyData.nodes.find(
+          (n: any) => n.zone === "IT" && n.name.startsWith(device.name)
+        );
+        if (nodeWithType?.template_id) {
+          updateDeviceTemplate(device.name, nodeWithType.template_id, true);
+        }
+      });
+
+      // Update OT devices
+      otDevices.forEach((device) => {
+        const count = deviceCounts[`OT-${device.name}`] || 0;
+        updateDeviceCount(device.name, count, false);
+
+        // Update template if found in topology data
+        const nodeWithType = topologyData.nodes.find(
+          (n: any) => n.zone === "OT" && n.name.startsWith(device.name)
+        );
+        if (nodeWithType?.template_id) {
+          updateDeviceTemplate(device.name, nodeWithType.template_id, false);
+        }
+      });
+
+      // Update firewall configuration
+      const firewallCount = deviceCounts["DMZ-Firewall"] || 0;
+      const firewallNode = topologyData.nodes.find((n: any) =>
+        n.name.startsWith("Firewall")
       );
 
-      // Example of what you might do:
-      // 1. Parse topologyData.nodes to extract device counts
-      // 2. Update your state with those values
-      // 3. Set the project if it's in the data
+      setFirewallConfig((prev) => ({
+        ...prev,
+        count: firewallCount,
+        ...(firewallNode?.template_id && {
+          templateId: firewallNode.template_id,
+        }),
+      }));
+
+      alert(`Successfully loaded scenario: ${scenario.name}`);
     } catch (err) {
       console.error("Failed to load scenario:", err);
-      alert("Failed to load scenario.");
+      alert("Failed to load scenario. The data format may be incompatible.");
     }
   };
 
@@ -134,7 +193,7 @@ const TopologyBuilder: React.FC = () => {
   };
 
   const handleBuildJSON = async () => {
-    console.log("GNS3 IP:", currentGns3Ip);
+    // console.log("GNS3 IP:", currentGns3Ip);
     const scenario = generateTopologyJSON(
       currentGns3Ip,
       itDevices,
@@ -143,9 +202,9 @@ const TopologyBuilder: React.FC = () => {
       templates,
       selectedProject
     );
-      const response = await buildScenario(scenario, currentGns3Ip, true);
+    const response = await buildScenario(scenario, currentGns3Ip, true);
 
-      console.log("Build Scenario response:", response);
+    // console.log("Build Scenario response:", response);
   };
 
   if (templatesLoading || projectsLoading) {
@@ -200,10 +259,12 @@ const TopologyBuilder: React.FC = () => {
       {/* Server Configuration Section */}
       {showServerConfig && (
         <div className="mb-8">
-          {<IpInput 
-            onIpChange={setCurrentGns3Ip}
-            onValidConnection={setIsServerConnected}
-          />}
+          {
+            <IpInput
+              onIpChange={setCurrentGns3Ip}
+              onValidConnection={setIsServerConnected}
+            />
+          }
         </div>
       )}
 
@@ -387,25 +448,23 @@ const TopologyBuilder: React.FC = () => {
         </div>
       </div>
 
-      {/* Generate & Save Buttons */}
-      <div className="mt-8 flex justify-center gap-4">
+      {/* Generate, Build & Save Buttons */}
+      <div className="mt-8 flex justify-center gap-4 relative">
         <button
           onClick={handleDownloadJSON}
           className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
         >
           Download Topology JSON
         </button>
-      </div>
 
-      {/* Generate Button */}
-      <div className="mt-8 flex justify-center">
         <button
           onClick={handleBuildJSON}
           className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
         >
           Build and Send Topology to GNS3 Server
         </button>
-
+      </div>
+      <div className="mt-8 flex gap-4 justify-center relative">
         <SaveScenarioForm
           currentGns3Ip={currentGns3Ip}
           itDevices={itDevices}
