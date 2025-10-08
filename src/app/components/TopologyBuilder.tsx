@@ -76,6 +76,17 @@ const TopologyBuilder: React.FC = () => {
     }
   }, [templates]);
 
+  // Helper function to save active scenario to localStorage
+  const saveActiveScenario = (scenarioData: any, scenarioName: string) => {
+    const activeScenario = {
+      name: scenarioName,
+      nodes: scenarioData.nodes || [],
+      gns3_server_ip: scenarioData.gns3_server_ip,
+      project_id: scenarioData.project_id,
+    };
+    localStorage.setItem("activeScenario", JSON.stringify(activeScenario));
+  };
+
   const handleDownloadJSON = () => {
     const scenario = generateTopologyJSON(
       currentGns3Ip,
@@ -165,6 +176,9 @@ const TopologyBuilder: React.FC = () => {
         }),
       }));
 
+      // Save as active scenario
+      saveActiveScenario(topologyData, scenario.name);
+
       alert(`Successfully loaded scenario: ${scenario.name}`);
     } catch (err) {
       console.error("Failed to load scenario:", err);
@@ -205,6 +219,15 @@ const TopologyBuilder: React.FC = () => {
     const response = await buildScenario(scenario, currentGns3Ip, true);
 
     // console.log("Build Scenario response:", response);
+    if (response) {
+      // Save as active scenario after successful build
+      const scenarioName = `Built Scenario - ${new Date().toLocaleString()}`;
+      saveActiveScenario(scenario, scenarioName);
+
+      alert(
+        `Scenario built successfully! You can now deploy scripts to the nodes.`
+      );
+    }
   };
 
   if (templatesLoading || projectsLoading) {
