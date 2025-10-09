@@ -11,6 +11,8 @@ import { useBuildScenario } from "../hooks/useBuild";
 import { DeviceConfigRow } from "./DeviceConfigRow";
 import { AddDeviceButton } from "./AddDeviceButton";
 import { IpInput } from "./IpInput";
+import ScriptDeployment from './ScriptPusher';
+
 
 // Constants
 import {
@@ -28,7 +30,7 @@ const TopologyBuilder: React.FC = () => {
   process.env.NEXT_PUBLIC_GNS3_IP || ""
 );
   const [isServerConnected, setIsServerConnected] = useState(false);
-
+  const [startScenario, setStartScenario] = useState(false);
   // Custom hooks
   const {
     templates,
@@ -87,7 +89,7 @@ const TopologyBuilder: React.FC = () => {
       templates,
       selectedProject
     );
-      const response = await buildScenario(scenario, currentGns3Ip, true);
+      const response = await buildScenario(scenario, currentGns3Ip, startScenario);
 
       console.log("Build Scenario response:", response);
   };
@@ -331,25 +333,34 @@ const TopologyBuilder: React.FC = () => {
         </div>
       </div>
 
-      {/* Generate Button */}
-      <div className="mt-8 flex justify-center">
-        <button
-          onClick={handleDownloadJSON}
-          className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
-        >
-          Download Topology JSON
-        </button>
-      </div>
+    <div className="mt-8 flex justify-center items-center gap-6">
+      {/* Download Button */}
+      <button
+        onClick={handleDownloadJSON}
+        className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
+      >
+        Download Topology JSON
+      </button>
 
-      {/* Generate Button */}
-      <div className="mt-8 flex justify-center">
-        <button
-          onClick={handleBuildJSON}
-          className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
-        >
-          Build and Send Topology to GNS3 Server
-        </button>
-      </div>
+      {/* Build Button */}
+      <button
+        onClick={handleBuildJSON}
+        className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
+      >
+        Build and Send Topology to GNS3 Server
+      </button>
+
+      {/* Checkbox */}
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={startScenario}
+          onChange={(e) => setStartScenario(e.target.checked)}
+          className="w-4 h-4 accent-indigo-600"
+        />
+        <span className="text-white-700">Start Scenario</span>
+      </label>
+    </div>
 
       {/* Preview */}
       <div className="mt-8">
@@ -364,6 +375,46 @@ const TopologyBuilder: React.FC = () => {
             {firewallConfig.count !== 1 ? "s" : ""}
           </div>
         </div>
+      </div>
+
+      {/* Script Deployment Section */}
+      <div className="mt-12">
+        <ScriptDeployment 
+          nodes={(() => {
+            const nodes: Array<{ node_id: string; name: string }> = [];
+            
+            // Add IT devices
+            itDevices.forEach((device) => {
+              for (let i = 0; i < device.count; i++) {
+                nodes.push({
+                  node_id: `${device.name}_${i + 1}`,
+                  name: `${device.name}_${i + 1}`
+                });
+              }
+            });
+            
+            // Add OT devices
+            otDevices.forEach((device) => {
+              for (let i = 0; i < device.count; i++) {
+                nodes.push({
+                  node_id: `${device.name}_${i + 1}`,
+                  name: `${device.name}_${i + 1}`
+                });
+              }
+            });
+            
+            // Add firewalls
+            for (let i = 0; i < firewallConfig.count; i++) {
+              nodes.push({
+                node_id: `Firewall_${i + 1}`,
+                name: `Firewall_${i + 1}`
+              });
+            }
+            
+            return nodes;
+          })()}
+          gns3ServerIp={currentGns3Ip}
+        />
       </div>
     </div>
   );
