@@ -5,11 +5,17 @@ import { ChevronDown, ChevronUp, Shield, Settings } from "lucide-react";
 import { useTemplates } from "../hooks/useTemplates";
 import { useProjects } from "../hooks/useProjects";
 import { useTopologyConfig } from "../hooks/useTopologyConfig";
+import { useScenarios } from "../hooks/useScenarios";
 import { useBuildScenario } from "../hooks/useBuild";
 
 // Components
 import { DeviceConfigRow } from "./DeviceConfigRow";
 import { AddDeviceButton } from "./AddDeviceButton";
+import { SaveScenarioForm } from "./SaveScenarioForm";
+import { ScenarioListItem } from "./ScenarioListItem";
+
+// Types
+import { Scenario } from "../lib/db";
 import { IpInput } from "./IpInput";
 import ScriptDeployment from './ScriptPusher';
 
@@ -27,8 +33,8 @@ const TopologyBuilder: React.FC = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showServerConfig, setShowServerConfig] = useState(false);
   const [currentGns3Ip, setCurrentGns3Ip] = useState<string>(
-  process.env.NEXT_PUBLIC_GNS3_IP || ""
-);
+    process.env.NEXT_PUBLIC_GNS3_IP || ""
+  );
   const [isServerConnected, setIsServerConnected] = useState(false);
   const [startScenario, setStartScenario] = useState(false);
   // Custom hooks
@@ -57,8 +63,13 @@ const TopologyBuilder: React.FC = () => {
     addDevice,
   } = useTopologyConfig(templates);
 
-  const { buildScenario, loading: buildLoading, error: buildError, result } = useBuildScenario();
-
+  const { scenarios, deleteScenario } = useScenarios();
+  const {
+    buildScenario,
+    loading: buildLoading,
+    error: buildError,
+    result,
+  } = useBuildScenario();
 
   // Initialize template IDs when templates are loaded
   useEffect(() => {
@@ -66,6 +77,17 @@ const TopologyBuilder: React.FC = () => {
       initializeTemplateIds();
     }
   }, [templates]);
+
+  // Helper function to save active scenario to localStorage
+  const saveActiveScenario = (scenarioData: any, scenarioName: string) => {
+    const activeScenario = {
+      name: scenarioName,
+      nodes: scenarioData.nodes || [],
+      gns3_server_ip: scenarioData.gns3_server_ip,
+      project_id: scenarioData.project_id,
+    };
+    localStorage.setItem("activeScenario", JSON.stringify(activeScenario));
+  };
 
   const handleDownloadJSON = () => {
     const scenario = generateTopologyJSON(
@@ -79,8 +101,115 @@ const TopologyBuilder: React.FC = () => {
     downloadJSON(scenario);
   };
 
+  const handleLoadScenario = (scenario: Scenario) => {
+    const confirmed = window.confirm(
+      `Load scenario "${scenario.name}"? This will replace your current configuration.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const topologyData = scenario.topology_data;
+
+      // Set GNS3 IP if available
+      if (topologyData.gns3_server_ip) {
+        setCurrentGns3Ip(topologyData.gns3_server_ip);
+      }
+
+      // Set project if available
+      if (topologyData.project_id) {
+        const project = projects.find(
+          (p) => p.project_id === topologyData.project_id
+        );
+        if (project) {
+          setSelectedProject(project);
+        }
+      }
+
+      // Count devices by type and zone
+      const deviceCounts = topologyData.nodes.reduce((acc: any, node: any) => {
+        // Extract device type from node name (e.g., "Workstations_1" -> "Workstations")
+        const deviceType = node.name.replace(/_\d+$/, "");
+        const key = `${node.zone}-${deviceType}`;
+
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Update IT devices
+      itDevices.forEach((device) => {
+        const count = deviceCounts[`IT-${device.name}`] || 0;
+        updateDeviceCount(device.name, count, true);
+
+        // Update template if found in topology data
+        const nodeWithType = topologyData.nodes.find(
+          (n: any) => n.zone === "IT" && n.name.startsWith(device.name)
+        );
+        if (nodeWithType?.template_id) {
+          updateDeviceTemplate(device.name, nodeWithType.template_id, true);
+        }
+      });
+
+      // Update OT devices
+      otDevices.forEach((device) => {
+        const count = deviceCounts[`OT-${device.name}`] || 0;
+        updateDeviceCount(device.name, count, false);
+
+        // Update template if found in topology data
+        const nodeWithType = topologyData.nodes.find(
+          (n: any) => n.zone === "OT" && n.name.startsWith(device.name)
+        );
+        if (nodeWithType?.template_id) {
+          updateDeviceTemplate(device.name, nodeWithType.template_id, false);
+        }
+      });
+
+      // Update firewall configuration
+      const firewallCount = deviceCounts["DMZ-Firewall"] || 0;
+      const firewallNode = topologyData.nodes.find((n: any) =>
+        n.name.startsWith("Firewall")
+      );
+
+      setFirewallConfig((prev) => ({
+        ...prev,
+        count: firewallCount,
+        ...(firewallNode?.template_id && {
+          templateId: firewallNode.template_id,
+        }),
+      }));
+
+      // Save as active scenario
+      saveActiveScenario(topologyData, scenario.name);
+
+      alert(`Successfully loaded scenario: ${scenario.name}`);
+    } catch (err) {
+      console.error("Failed to load scenario:", err);
+      alert("Failed to load scenario. The data format may be incompatible.");
+    }
+  };
+
+  const handleDeleteScenario = async (id: number, name: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${name}"? This cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteScenario(id);
+      alert("Scenario deleted successfully!");
+    } catch (err) {
+      console.error("Failed to delete scenario:", err);
+      alert("Failed to delete scenario. Please try again.");
+    }
+  };
+
+  const handleExportScenario = (scenario: Scenario) => {
+    downloadJSON(scenario.topology_data);
+  };
+
   const handleBuildJSON = async () => {
-    console.log("GNS3 IP:", currentGns3Ip);
+    // console.log("GNS3 IP:", currentGns3Ip);
     const scenario = generateTopologyJSON(
       currentGns3Ip,
       itDevices,
@@ -91,7 +220,16 @@ const TopologyBuilder: React.FC = () => {
     );
       const response = await buildScenario(scenario, currentGns3Ip, startScenario);
 
-      console.log("Build Scenario response:", response);
+    // console.log("Build Scenario response:", response);
+    if (response) {
+      // Save as active scenario after successful build
+      const scenarioName = `Built Scenario - ${new Date().toLocaleString()}`;
+      saveActiveScenario(scenario, scenarioName);
+
+      alert(
+        `Scenario built successfully! You can now deploy scripts to the nodes.`
+      );
+    }
   };
 
   if (templatesLoading || projectsLoading) {
@@ -146,10 +284,12 @@ const TopologyBuilder: React.FC = () => {
       {/* Server Configuration Section */}
       {showServerConfig && (
         <div className="mb-8">
-          {<IpInput 
-            onIpChange={setCurrentGns3Ip}
-            onValidConnection={setIsServerConnected}
-          />}
+          {
+            <IpInput
+              onIpChange={setCurrentGns3Ip}
+              onValidConnection={setIsServerConnected}
+            />
+          }
         </div>
       )}
 

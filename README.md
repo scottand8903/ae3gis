@@ -1,21 +1,27 @@
 # Getting Started
 
-This assumes that you have the docker templates loaded into GNS3
+This assumes that you have the docker templates loaded into GNS3 \
+GNS3 VM must be on 
+
+Interface for https://github.com/TollanBerhanu/ae3gis-gns3-api
 
 ## Dependencies:
 
-lucide-react (icons)
+lucide-react (icons) \
+dexie \
+dexie-react-hooks
 
-## If you don't have pnpm installed:
+## Installing Dependencies:
 
-npm install -g pnpm
+npm install -g pnpm (optional)
 
-pnpm add lucide-react
+npm add lucide-react \
+npm install dexie dexie-react-hooks
 
 ## Create .env.local file
 
-GNS3_URL=http://{IP_ADDRESS}:{PORT_NUMBER}/v2
-AE3GIS_URL=http://{IP of AE3GIS API}:{PORT}
+GNS3_URL=http://{IP_ADDRESS}:{PORT_NUMBER}/v2 \
+AE3GIS_URL=http://{IP of AE3GIS API}:{PORT} \
 NEXT_PUBLIC_GNS3_IP={IP Address of GNS3 Server}
 
 ## First, run the development server:
