@@ -17,6 +17,8 @@ import { ScenarioListItem } from "./ScenarioListItem";
 // Types
 import { Scenario } from "../lib/db";
 import { IpInput } from "./IpInput";
+import ScriptDeployment from './ScriptPusher';
+
 
 // Constants
 import {
@@ -34,7 +36,7 @@ const TopologyBuilder: React.FC = () => {
     process.env.NEXT_PUBLIC_GNS3_IP || ""
   );
   const [isServerConnected, setIsServerConnected] = useState(false);
-
+  const [startScenario, setStartScenario] = useState(false);
   // Custom hooks
   const {
     templates,
@@ -216,7 +218,7 @@ const TopologyBuilder: React.FC = () => {
       templates,
       selectedProject
     );
-    const response = await buildScenario(scenario, currentGns3Ip, true);
+      const response = await buildScenario(scenario, currentGns3Ip, startScenario);
 
     // console.log("Build Scenario response:", response);
     if (response) {
@@ -471,57 +473,34 @@ const TopologyBuilder: React.FC = () => {
         </div>
       </div>
 
-      {/* Generate, Build & Save Buttons */}
-      <div className="mt-8 flex justify-center gap-4 relative">
-        <button
-          onClick={handleDownloadJSON}
-          className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
-        >
-          Download Topology JSON
-        </button>
+    <div className="mt-8 flex justify-center items-center gap-6">
+      {/* Download Button */}
+      <button
+        onClick={handleDownloadJSON}
+        className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
+      >
+        Download Topology JSON
+      </button>
 
-        <button
-          onClick={handleBuildJSON}
-          className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
-        >
-          Build and Send Topology to GNS3 Server
-        </button>
-      </div>
-      <div className="mt-8 flex gap-4 justify-center relative">
-        <SaveScenarioForm
-          currentGns3Ip={currentGns3Ip}
-          itDevices={itDevices}
-          otDevices={otDevices}
-          firewallConfig={firewallConfig}
-          templates={templates}
-          selectedProject={selectedProject}
+      {/* Build Button */}
+      <button
+        onClick={handleBuildJSON}
+        className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
+      >
+        Build and Send Topology to GNS3 Server
+      </button>
+
+      {/* Checkbox */}
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={startScenario}
+          onChange={(e) => setStartScenario(e.target.checked)}
+          className="w-4 h-4 accent-indigo-600"
         />
-      </div>
-
-      {/* Saved Scenarios List */}
-      <div className="mt-8 bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
-        <h3 className="text-lg font-semibold text-gray-100 mb-4">
-          Saved Scenarios {scenarios && `(${scenarios.length})`}
-        </h3>
-
-        {!scenarios || scenarios.length === 0 ? (
-          <p className="text-gray-400 text-center py-8">
-            No saved scenarios yet. Save your first configuration above!
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {scenarios.map((scenario) => (
-              <ScenarioListItem
-                key={scenario.id}
-                scenario={scenario}
-                onLoad={handleLoadScenario}
-                onExport={handleExportScenario}
-                onDelete={handleDeleteScenario}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+        <span className="text-white-700">Start Scenario</span>
+      </label>
+    </div>
 
       {/* Preview */}
       <div className="mt-8">
@@ -536,6 +515,46 @@ const TopologyBuilder: React.FC = () => {
             {firewallConfig.count !== 1 ? "s" : ""}
           </div>
         </div>
+      </div>
+
+      {/* Script Deployment Section */}
+      <div className="mt-12">
+        <ScriptDeployment 
+          nodes={(() => {
+            const nodes: Array<{ node_id: string; name: string }> = [];
+            
+            // Add IT devices
+            itDevices.forEach((device) => {
+              for (let i = 0; i < device.count; i++) {
+                nodes.push({
+                  node_id: `${device.name}_${i + 1}`,
+                  name: `${device.name}_${i + 1}`
+                });
+              }
+            });
+            
+            // Add OT devices
+            otDevices.forEach((device) => {
+              for (let i = 0; i < device.count; i++) {
+                nodes.push({
+                  node_id: `${device.name}_${i + 1}`,
+                  name: `${device.name}_${i + 1}`
+                });
+              }
+            });
+            
+            // Add firewalls
+            for (let i = 0; i < firewallConfig.count; i++) {
+              nodes.push({
+                node_id: `Firewall_${i + 1}`,
+                name: `Firewall_${i + 1}`
+              });
+            }
+            
+            return nodes;
+          })()}
+          gns3ServerIp={currentGns3Ip}
+        />
       </div>
     </div>
   );
