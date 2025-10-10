@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Node, Project } from "../types/topology";
+import { Node } from "../types/topology";
 
 interface ActiveScenario {
   name: string;
@@ -27,19 +27,30 @@ interface DeploymentPayload {
   concurrency: number;
 }
 
+// Hardcoded available scripts - replace with your actual scripts
+const AVAILABLE_SCRIPTS = [
+  "hello.sh",
+  "hi.sh",
+  "run_dhcp_client.sh",
+  "run_dhcp.sh",
+  "run_http.sh",
+  "run_server.sh",
+];
+
 const TestPage: React.FC = () => {
-  const [selectedNode, setSelectedNode] = useState<string>("");
-  const [localPath, setLocalPath] = useState<string>("");
-  const [remotePath, setRemotePath] = useState<string>("");
   const [gns3ServerIp, setGns3ServerIp] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
   const [activeScenario, setActiveScenario] = useState<ActiveScenario | null>(
     null
   );
+  const [selectedScripts, setSelectedScripts] = useState<
+    Record<string, string>
+  >({});
+  const [deployingNodes, setDeployingNodes] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+    nodeId?: string;
+  } | null>(null);
 
   // Load active scenario from localStorage on mount
   useEffect(() => {
@@ -72,40 +83,43 @@ const TestPage: React.FC = () => {
     );
   }, [activeScenario]);
 
-  // All nodes sorted by name
-  const availableNodes = useMemo(() => {
-    if (!activeScenario?.nodes) return [];
+  const handleScriptSelect = (nodeId: string, scriptFilename: string) => {
+    setSelectedScripts((prev) => ({
+      ...prev,
+      [nodeId]: scriptFilename,
+    }));
+  };
 
-    return [...activeScenario.nodes].sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
-  }, [activeScenario]);
+  const handleDeploy = async (node: Node) => {
+    const scriptFilename = selectedScripts[node.node_id];
 
-  const handleSubmit = async () => {
-    if (!selectedNode) {
-      setMessage({ type: "error", text: "Please select a node" });
-      return;
-    }
-
-    if (!localPath || !remotePath) {
-      setMessage({ type: "error", text: "Please fill in all paths" });
+    if (!scriptFilename) {
+      setMessage({
+        type: "error",
+        text: "Please select a script first",
+        nodeId: node.node_id,
+      });
       return;
     }
 
     if (!gns3ServerIp) {
-      setMessage({ type: "error", text: "Please enter GNS3 server IP" });
+      setMessage({
+        type: "error",
+        text: "GNS3 Server IP is required",
+        nodeId: node.node_id,
+      });
       return;
     }
 
-    setLoading(true);
+    setDeployingNodes((prev) => new Set(prev).add(node.node_id));
     setMessage(null);
 
     const payload: DeploymentPayload = {
       scripts: [
         {
-          node_name: selectedNode,
-          local_path: localPath,
-          remote_path: remotePath,
+          node_name: node.name,
+          local_path: `/home/scott/Documents/GitHub/ae3gis-gns3-api/scripts/${scriptFilename}`,
+          remote_path: `/tmp/${scriptFilename}`,
           run_after_upload: false,
           executable: true,
           overwrite: true,
@@ -131,23 +145,31 @@ const TestPage: React.FC = () => {
         throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
       }
 
-      const data = await res.json();
+      await res.json();
       setMessage({
         type: "success",
-        text: `Script deployed successfully to ${selectedNode}!`,
+        text: `Successfully deployed ${scriptFilename} to ${node.name}`,
+        nodeId: node.node_id,
       });
 
-      // Reset form fields
-      setSelectedNode("");
-      setLocalPath("");
-      setRemotePath("");
+      // Clear selection for this node after successful deployment
+      setSelectedScripts((prev) => {
+        const updated = { ...prev };
+        delete updated[node.node_id];
+        return updated;
+      });
     } catch (err) {
       setMessage({
         type: "error",
-        text: err instanceof Error ? err.message : "Unknown error occurred",
+        text: err instanceof Error ? err.message : "Deployment failed",
+        nodeId: node.node_id,
       });
     } finally {
-      setLoading(false);
+      setDeployingNodes((prev) => {
+        const updated = new Set(prev);
+        updated.delete(node.node_id);
+        return updated;
+      });
     }
   };
 
@@ -165,7 +187,7 @@ const TestPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-6">
       <h1 className="text-3xl font-bold text-gray-100 mb-2">
         Script Deployment
       </h1>
@@ -187,197 +209,138 @@ const TestPage: React.FC = () => {
           </ul>
         </div>
       ) : (
-        <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-green-400 font-semibold text-sm">
-                ✓ Active Scenario
-              </h3>
-              <p className="text-gray-300 text-sm mt-1">
-                {activeScenario.name}
-              </p>
-            </div>
-            <div className="text-right text-xs text-gray-400">
-              <div>{availableNodes.length} nodes available</div>
-              {activeScenario.project_id && (
-                <div className="mt-1">Project: {activeScenario.project_id}</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e] space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            GNS3 Server IP
-          </label>
-          <input
-            type="text"
-            value={gns3ServerIp}
-            onChange={(e) => setGns3ServerIp(e.target.value)}
-            placeholder="192.168.56.102"
-            className="w-full px-3 py-2 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Target Node
-            {availableNodes.length > 0 && (
-              <span className="ml-2 text-xs text-gray-500">
-                ({availableNodes.length} available)
-              </span>
-            )}
-          </label>
-          <select
-            value={selectedNode}
-            onChange={(e) => setSelectedNode(e.target.value)}
-            disabled={!activeScenario}
-            className="w-full px-3 py-2 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <option value="" className="bg-[#252535]">
-              -- Select a Node --
-            </option>
-            {availableNodes.length === 0 ? (
-              <option value="" disabled className="bg-[#252535] text-gray-500">
-                No nodes in active scenario
-              </option>
-            ) : (
-              <>
-                {nodesByZone.IT.length > 0 && (
-                  <optgroup label="IT Network" className="bg-[#252535]">
-                    {nodesByZone.IT.map((node) => (
-                      <option
-                        key={node.node_id}
-                        value={node.name}
-                        className="bg-[#252535]"
-                      >
-                        {node.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {nodesByZone.OT.length > 0 && (
-                  <optgroup label="OT Network" className="bg-[#252535]">
-                    {nodesByZone.OT.map((node) => (
-                      <option
-                        key={node.node_id}
-                        value={node.name}
-                        className="bg-[#252535]"
-                      >
-                        {node.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {nodesByZone.DMZ.length > 0 && (
-                  <optgroup label="DMZ / Security" className="bg-[#252535]">
-                    {nodesByZone.DMZ.map((node) => (
-                      <option
-                        key={node.node_id}
-                        value={node.name}
-                        className="bg-[#252535]"
-                      >
-                        {node.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </>
-            )}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Local Path
-            <span className="ml-2 text-xs text-gray-500">
-              (path on your local machine)
-            </span>
-          </label>
-          <input
-            type="text"
-            value={localPath}
-            onChange={(e) => setLocalPath(e.target.value)}
-            placeholder="/path/to/script.sh"
-            disabled={!activeScenario}
-            className="w-full px-3 py-2 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Remote Path
-            <span className="ml-2 text-xs text-gray-500">
-              (destination path on the node)
-            </span>
-          </label>
-          <input
-            type="text"
-            value={remotePath}
-            onChange={(e) => setRemotePath(e.target.value)}
-            placeholder="/tmp/script.sh"
-            disabled={!activeScenario}
-            className="w-full px-3 py-2 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-        </div>
-
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !activeScenario || availableNodes.length === 0}
-          className="w-full px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading ? "Deploying..." : "Deploy Script"}
-        </button>
-      </div>
-
-      {message && (
-        <div
-          className={`mt-4 p-4 rounded-lg ${
-            message.type === "success"
-              ? "bg-green-900/20 border border-green-500/50 text-green-400"
-              : "bg-red-900/20 border border-red-500/50 text-red-400"
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
-
-      {/* Node list grouped by zone */}
-      {activeScenario && availableNodes.length > 0 && (
-        <div className="mt-6 bg-[#2a2a3e] rounded-lg p-4 border border-[#3a3a4e]">
-          <h3 className="text-sm font-semibold text-gray-300 mb-3">
-            Available Nodes by Zone
-          </h3>
-          <div className="space-y-4">
-            {Object.entries(nodesByZone).map(([zone, nodes]) => {
-              if (nodes.length === 0) return null;
-              return (
-                <div key={zone}>
-                  <h4 className="text-xs font-semibold text-gray-400 mb-2 uppercase">
-                    {zone} Network ({nodes.length})
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {nodes.map((node) => (
-                      <div
-                        key={node.node_id}
-                        className={`text-xs px-3 py-2 rounded border ${getZoneBadgeColor(
-                          zone
-                        )}`}
-                      >
-                        <div className="font-medium">{node.name}</div>
-                        <div className="text-[10px] opacity-70 mt-0.5">
-                          ID: {node.node_id.slice(0, 8)}...
-                        </div>
-                      </div>
-                    ))}
+        <>
+          <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-green-400 font-semibold text-sm">
+                  ✓ Active Scenario
+                </h3>
+                <p className="text-gray-300 text-sm mt-1">
+                  {activeScenario.name}
+                </p>
+              </div>
+              <div className="text-right text-xs text-gray-400">
+                <div>{activeScenario.nodes.length} nodes available</div>
+                {activeScenario.project_id && (
+                  <div className="mt-1">
+                    Project: {activeScenario.project_id}
                   </div>
-                </div>
-              );
-            })}
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+
+          <div className="bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e] mb-6">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              GNS3 Server IP
+            </label>
+            <input
+              type="text"
+              value={gns3ServerIp}
+              onChange={(e) => setGns3ServerIp(e.target.value)}
+              placeholder="192.168.56.102"
+              className="w-full px-3 py-2 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* Available Nodes by Zone */}
+          <div className="bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
+            <h3 className="text-lg font-semibold text-gray-300 mb-4">
+              Deploy Scripts to Nodes
+            </h3>
+            <div className="space-y-6">
+              {Object.entries(nodesByZone).map(([zone, nodes]) => {
+                if (nodes.length === 0) return null;
+                return (
+                  <div key={zone}>
+                    <h4
+                      className={`text-sm font-semibold mb-3 px-3 py-1.5 rounded inline-block border ${getZoneBadgeColor(
+                        zone
+                      )}`}
+                    >
+                      {zone} Network ({nodes.length})
+                    </h4>
+                    <div className="space-y-3 mt-3">
+                      {nodes.map((node) => {
+                        const isDeploying = deployingNodes.has(node.node_id);
+                        const hasMessage = message?.nodeId === node.node_id;
+
+                        return (
+                          <div
+                            key={node.node_id}
+                            className="bg-[#333347] rounded-lg border border-[#3a3a4e] p-4"
+                          >
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="text-sm font-medium text-gray-200 mb-1">
+                                  {node.name}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  ID: {node.node_id.slice(0, 8)}...
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3 flex-1">
+                                <select
+                                  value={selectedScripts[node.node_id] || ""}
+                                  onChange={(e) =>
+                                    handleScriptSelect(
+                                      node.node_id,
+                                      e.target.value
+                                    )
+                                  }
+                                  disabled={isDeploying}
+                                  className="flex-1 px-3 py-2 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 text-sm"
+                                >
+                                  <option value="" className="bg-[#252535]">
+                                    -- Select Script --
+                                  </option>
+                                  {AVAILABLE_SCRIPTS.map((script) => (
+                                    <option
+                                      key={script}
+                                      value={script}
+                                      className="bg-[#252535]"
+                                    >
+                                      {script}
+                                    </option>
+                                  ))}
+                                </select>
+
+                                <button
+                                  onClick={() => handleDeploy(node)}
+                                  disabled={
+                                    !selectedScripts[node.node_id] ||
+                                    isDeploying
+                                  }
+                                  className="px-4 py-2 bg-green-600 text-white font-medium rounded-md hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors text-sm whitespace-nowrap"
+                                >
+                                  {isDeploying ? "Deploying..." : "Deploy"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {hasMessage && message && (
+                              <div
+                                className={`mt-3 p-2 rounded text-xs ${
+                                  message.type === "success"
+                                    ? "bg-green-900/30 text-green-400"
+                                    : "bg-red-900/30 text-red-400"
+                                }`}
+                              >
+                                {message.text}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
