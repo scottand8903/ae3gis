@@ -7,12 +7,15 @@ import { useProjects } from "../hooks/useProjects";
 import { useTopologyConfig } from "../hooks/useTopologyConfig";
 import { useScenarios } from "../hooks/useScenarios";
 import { useBuildScenario } from "../hooks/useBuild";
+import { useSaveTopology } from "../hooks/useTopology";
 
 // Components
 import { DeviceConfigRow } from "./DeviceConfigRow";
 import { AddDeviceButton } from "./AddDeviceButton";
 import { SaveScenarioForm } from "./SaveScenarioForm";
 import { ScenarioListItem } from "./ScenarioListItem";
+import SaveScenarioSection from './SaveTopology';
+import SavedTopologyDropdown from "./SavedTopologyDropdown";
 
 // Types
 import { Scenario } from "../lib/db";
@@ -71,6 +74,14 @@ const TopologyBuilder: React.FC = () => {
     result,
   } = useBuildScenario();
 
+  const { 
+    saveTopology, 
+    loading: 
+    saveLoading, 
+    error: saveError, 
+    result:
+    saveResult } = useSaveTopology();
+
   // Initialize template IDs when templates are loaded
   useEffect(() => {
     if (templates.length > 0) {
@@ -88,6 +99,30 @@ const TopologyBuilder: React.FC = () => {
     };
     localStorage.setItem("activeScenario", JSON.stringify(activeScenario));
   };
+
+  const handleSaveJSON = async (name: string, description: string) => {
+  // console.log("GNS3 IP:", currentGns3Ip);
+  const scenario = generateTopologyJSON(
+    currentGns3Ip,
+    itDevices,
+    otDevices,
+    firewallConfig,
+    templates,
+    selectedProject
+  );
+    const response = await saveTopology(scenario, name, description);
+
+  // console.log("Build Scenario response:", response);
+  if (response) {
+    // Save as active scenario after successful build
+    const scenarioName = `Built Scenario - ${new Date().toLocaleString()}`;
+    saveActiveScenario(scenario, scenarioName);
+
+    alert(
+      `Scenario built successfully! You can now deploy scripts to the nodes.`
+    );
+  }
+};
 
   const handleDownloadJSON = () => {
     const scenario = generateTopologyJSON(
@@ -520,7 +555,13 @@ const TopologyBuilder: React.FC = () => {
           <span className="text-white-700">Start Scenario</span>
         </label>
       </div>
-
+      <div className="mt-8">
+      <SaveScenarioSection 
+        onSave={handleSaveJSON}
+        loading={saveLoading}
+      />
+    </div>  
+    <SavedTopologyDropdown />  
       <div className="mt-8 flex gap-4 justify-center relative">
         <SaveScenarioForm
           currentGns3Ip={currentGns3Ip}
