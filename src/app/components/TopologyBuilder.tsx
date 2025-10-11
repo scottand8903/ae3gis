@@ -5,20 +5,14 @@ import { ChevronDown, ChevronUp, Shield, Settings } from "lucide-react";
 import { useTemplates } from "../hooks/useTemplates";
 import { useProjects } from "../hooks/useProjects";
 import { useTopologyConfig } from "../hooks/useTopologyConfig";
-import { useScenarios } from "../hooks/useScenarios";
+import { useTopologies } from "../hooks/useTopology";
 import { useBuildScenario } from "../hooks/useBuild";
-import { useSaveTopology } from "../hooks/useTopology";
 
 // Components
 import { DeviceConfigRow } from "./DeviceConfigRow";
 import { AddDeviceButton } from "./AddDeviceButton";
-import { SaveScenarioForm } from "./SaveScenarioForm";
-import { ScenarioListItem } from "./ScenarioListItem";
-import SaveScenarioSection from './SaveTopology';
-import SavedTopologyDropdown from "./SavedTopologyDropdown";
-
-// Types
-import { Scenario } from "../lib/db";
+import SaveScenarioSection from "./SaveTopology";
+import SavedTopologyList from "./SavedTopologyList";
 import { IpInput } from "./IpInput";
 import ScriptDeployment from "./ScriptPusher";
 
@@ -34,18 +28,19 @@ import { generateTopologyJSON, downloadJSON } from "../utils/topologyGenerator";
 const TopologyBuilder: React.FC = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showServerConfig, setShowServerConfig] = useState(false);
-  const [showSavedScenarios, setShowSavedScenarios] = useState(false);
   const [currentGns3Ip, setCurrentGns3Ip] = useState<string>(
     process.env.NEXT_PUBLIC_GNS3_IP || ""
   );
   const [isServerConnected, setIsServerConnected] = useState(false);
   const [startScenario, setStartScenario] = useState(false);
+
   // Custom hooks
   const {
     templates,
     loading: templatesLoading,
     error: templatesError,
   } = useTemplates();
+
   const {
     projects,
     selectedProject,
@@ -66,21 +61,13 @@ const TopologyBuilder: React.FC = () => {
     addDevice,
   } = useTopologyConfig(templates);
 
-  const { scenarios, deleteScenario } = useScenarios();
   const {
-    buildScenario,
-    loading: buildLoading,
-    error: buildError,
-    result,
-  } = useBuildScenario();
+    createTopology,
+    fetchTopologyById,
+    loading: saveLoading,
+  } = useTopologies();
 
-  const { 
-    saveTopology, 
-    loading: 
-    saveLoading, 
-    error: saveError, 
-    result:
-    saveResult } = useSaveTopology();
+  const { buildScenario, loading: buildLoading } = useBuildScenario();
 
   // Initialize template IDs when templates are loaded
   useEffect(() => {
@@ -101,28 +88,28 @@ const TopologyBuilder: React.FC = () => {
   };
 
   const handleSaveJSON = async (name: string, description: string) => {
-  // console.log("GNS3 IP:", currentGns3Ip);
-  const scenario = generateTopologyJSON(
-    currentGns3Ip,
-    itDevices,
-    otDevices,
-    firewallConfig,
-    templates,
-    selectedProject
-  );
-    const response = await saveTopology(scenario, name, description);
-
-  // console.log("Build Scenario response:", response);
-  if (response) {
-    // Save as active scenario after successful build
-    const scenarioName = `Built Scenario - ${new Date().toLocaleString()}`;
-    saveActiveScenario(scenario, scenarioName);
-
-    alert(
-      `Scenario built successfully! You can now deploy scripts to the nodes.`
+    const scenario = generateTopologyJSON(
+      currentGns3Ip,
+      itDevices,
+      otDevices,
+      firewallConfig,
+      templates,
+      selectedProject
     );
-  }
-};
+
+    try {
+      const response = await createTopology(name, scenario, description);
+
+      if (response) {
+        const scenarioName = `${name} - ${new Date().toLocaleString()}`;
+        saveActiveScenario(scenario, scenarioName);
+        alert(`Topology "${name}" saved successfully!`);
+      }
+    } catch (err) {
+      console.error("Failed to save topology:", err);
+      alert("Failed to save topology. Please try again.");
+    }
+  };
 
   const handleDownloadJSON = () => {
     const scenario = generateTopologyJSON(
@@ -136,15 +123,21 @@ const TopologyBuilder: React.FC = () => {
     downloadJSON(scenario);
   };
 
-  const handleLoadScenario = (scenario: Scenario) => {
+  const handleLoadTopology = async (id: string, name: string) => {
     const confirmed = window.confirm(
-      `Load scenario "${scenario.name}"? This will replace your current configuration.`
+      `Load topology "${name}"? This will replace your current configuration.`
     );
 
     if (!confirmed) return;
 
     try {
-      const topologyData = scenario.topology_data;
+      // Fetch the full topology data including scenario
+      const topology = await fetchTopologyById(id);
+      const topologyData = topology.scenario;
+
+      if (!topologyData || !topologyData.nodes) {
+        throw new Error("Invalid topology data - missing nodes");
+      }
 
       // Set GNS3 IP if available
       if (topologyData.gns3_server_ip) {
@@ -163,10 +156,8 @@ const TopologyBuilder: React.FC = () => {
 
       // Count devices by type and zone
       const deviceCounts = topologyData.nodes.reduce((acc: any, node: any) => {
-        // Extract device type from node name (e.g., "Workstations_1" -> "Workstations")
         const deviceType = node.name.replace(/_\d+$/, "");
         const key = `${node.zone}-${deviceType}`;
-
         acc[key] = (acc[key] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
@@ -176,7 +167,6 @@ const TopologyBuilder: React.FC = () => {
         const count = deviceCounts[`IT-${device.name}`] || 0;
         updateDeviceCount(device.name, count, true);
 
-        // Update template if found in topology data
         const nodeWithType = topologyData.nodes.find(
           (n: any) => n.zone === "IT" && n.name.startsWith(device.name)
         );
@@ -190,7 +180,6 @@ const TopologyBuilder: React.FC = () => {
         const count = deviceCounts[`OT-${device.name}`] || 0;
         updateDeviceCount(device.name, count, false);
 
-        // Update template if found in topology data
         const nodeWithType = topologyData.nodes.find(
           (n: any) => n.zone === "OT" && n.name.startsWith(device.name)
         );
@@ -214,37 +203,31 @@ const TopologyBuilder: React.FC = () => {
       }));
 
       // Save as active scenario
-      saveActiveScenario(topologyData, scenario.name);
+      saveActiveScenario(topologyData, name);
 
-      alert(`Successfully loaded scenario: ${scenario.name}`);
+      alert(`Successfully loaded topology: ${name}`);
     } catch (err) {
-      console.error("Failed to load scenario:", err);
-      alert("Failed to load scenario. The data format may be incompatible.");
+      console.error("Failed to load topology:", err);
+      alert(
+        `Failed to load topology: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
     }
   };
 
-  const handleDeleteScenario = async (id: number, name: string) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${name}"? This cannot be undone.`
-    );
-
-    if (!confirmed) return;
-
+  const handleExportTopology = async (id: string, name: string) => {
     try {
-      await deleteScenario(id);
-      alert("Scenario deleted successfully!");
+      // Fetch the full topology data including scenario
+      const topology = await fetchTopologyById(id);
+      downloadJSON(topology.scenario);
     } catch (err) {
-      console.error("Failed to delete scenario:", err);
-      alert("Failed to delete scenario. Please try again.");
+      console.error("Failed to export topology:", err);
+      alert("Failed to export topology. Please try again.");
     }
-  };
-
-  const handleExportScenario = (scenario: Scenario) => {
-    downloadJSON(scenario.topology_data);
   };
 
   const handleBuildJSON = async () => {
-    // console.log("GNS3 IP:", currentGns3Ip);
     const scenario = generateTopologyJSON(
       currentGns3Ip,
       itDevices,
@@ -253,20 +236,18 @@ const TopologyBuilder: React.FC = () => {
       templates,
       selectedProject
     );
+
     const response = await buildScenario(
       scenario,
       currentGns3Ip,
       startScenario
     );
 
-    // console.log("Build Scenario response:", response);
     if (response) {
-      // Save as active scenario after successful build
       const scenarioName = `Built Scenario - ${new Date().toLocaleString()}`;
       saveActiveScenario(scenario, scenarioName);
-
       alert(
-        `Scenario built successfully! You can now deploy scripts to the nodes.`
+        "Scenario built successfully! You can now deploy scripts to the nodes."
       );
     }
   };
@@ -323,12 +304,10 @@ const TopologyBuilder: React.FC = () => {
       {/* Server Configuration Section */}
       {showServerConfig && (
         <div className="mb-8">
-          {
-            <IpInput
-              onIpChange={setCurrentGns3Ip}
-              onValidConnection={setIsServerConnected}
-            />
-          }
+          <IpInput
+            onIpChange={setCurrentGns3Ip}
+            onValidConnection={setIsServerConnected}
+          />
         </div>
       )}
 
@@ -539,9 +518,12 @@ const TopologyBuilder: React.FC = () => {
         {/* Build Button */}
         <button
           onClick={handleBuildJSON}
-          className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg"
+          disabled={buildLoading}
+          className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-500 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Build and Send Topology to GNS3 Server
+          {buildLoading
+            ? "Building..."
+            : "Build and Send Topology to GNS3 Server"}
         </button>
 
         {/* Checkbox */}
@@ -552,65 +534,20 @@ const TopologyBuilder: React.FC = () => {
             onChange={(e) => setStartScenario(e.target.checked)}
             className="w-4 h-4 accent-indigo-600"
           />
-          <span className="text-white-700">Start Scenario</span>
+          <span className="text-gray-300">Start Scenario</span>
         </label>
       </div>
+
+      {/* Save Topology Section */}
       <div className="mt-8">
-      <SaveScenarioSection 
-        onSave={handleSaveJSON}
-        loading={saveLoading}
+        <SaveScenarioSection onSave={handleSaveJSON} loading={saveLoading} />
+      </div>
+
+      {/* Saved Topologies List */}
+      <SavedTopologyList
+        onLoad={handleLoadTopology}
+        onExport={handleExportTopology}
       />
-    </div>  
-    <SavedTopologyDropdown />  
-      <div className="mt-8 flex gap-4 justify-center relative">
-        <SaveScenarioForm
-          currentGns3Ip={currentGns3Ip}
-          itDevices={itDevices}
-          otDevices={otDevices}
-          firewallConfig={firewallConfig}
-          templates={templates}
-          selectedProject={selectedProject}
-        />
-      </div>
-
-      {/* Saved Scenarios List */}
-      <div className="mt-8">
-        <button
-          onClick={() => setShowSavedScenarios(!showSavedScenarios)}
-          className="flex items-center space-x-2 text-indigo-400 hover:text-indigo-300 transition-colors mb-4"
-        >
-          {showSavedScenarios ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )}
-          <span className="text-lg font-semibold">
-            Saved Scenarios {scenarios && `(${scenarios.length})`}
-          </span>
-        </button>
-
-        {showSavedScenarios && (
-          <div className="bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
-            {!scenarios || scenarios.length === 0 ? (
-              <p className="text-gray-400 text-center py-8">
-                No saved scenarios yet. Save your first configuration above!
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {scenarios.map((scenario) => (
-                  <ScenarioListItem
-                    key={scenario.id}
-                    scenario={scenario}
-                    onLoad={handleLoadScenario}
-                    onExport={handleExportScenario}
-                    onDelete={handleDeleteScenario}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Script Deployment Section */}
       <div className="mt-12">
@@ -618,7 +555,6 @@ const TopologyBuilder: React.FC = () => {
           nodes={(() => {
             const nodes: Array<{ node_id: string; name: string }> = [];
 
-            // Add IT devices
             itDevices.forEach((device) => {
               for (let i = 0; i < device.count; i++) {
                 nodes.push({
@@ -628,7 +564,6 @@ const TopologyBuilder: React.FC = () => {
               }
             });
 
-            // Add OT devices
             otDevices.forEach((device) => {
               for (let i = 0; i < device.count; i++) {
                 nodes.push({
@@ -638,7 +573,6 @@ const TopologyBuilder: React.FC = () => {
               }
             });
 
-            // Add firewalls
             for (let i = 0; i < firewallConfig.count; i++) {
               nodes.push({
                 node_id: `Firewall_${i + 1}`,
