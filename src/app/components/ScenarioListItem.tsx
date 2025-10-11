@@ -1,57 +1,76 @@
 import React from "react";
-import { Download, Trash2, FolderOpen } from "lucide-react";
-import { Scenario } from "../lib/db";
+import { Download, Upload, Trash2 } from "lucide-react";
 
-interface ScenarioListItemProps {
-  scenario: Scenario;
-  onLoad: (scenario: Scenario) => void;
-  onExport: (scenario: Scenario) => void;
-  onDelete: (id: number, name: string) => void;
+interface TopologyListItemData {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export const ScenarioListItem: React.FC<ScenarioListItemProps> = ({
-  scenario,
+interface TopologyListItemProps {
+  topology: TopologyListItemData;
+  onLoad: () => void;
+  onExport: () => void;
+  onDelete: () => void;
+}
+
+export const TopologyListItem: React.FC<TopologyListItemProps> = ({
+  topology,
   onLoad,
   onExport,
   onDelete,
-}) => (
-  <div className="bg-[#333347] rounded-lg p-4 border border-[#3a3a4e] hover:border-indigo-500/50 transition-colors">
-    <div className="flex items-start justify-between mb-3">
-      <div className="flex-1">
-        <h4 className="font-semibold text-gray-100 text-lg">{scenario.name}</h4>
-        {scenario.description && (
-          <p className="text-gray-400 text-sm mt-1">{scenario.description}</p>
-        )}
-        <p className="text-gray-500 text-xs mt-2">
-          Updated: {new Date(scenario.updated_at).toLocaleString()}
-        </p>
+}) => {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  return (
+    <div className="bg-[#333347] rounded-lg p-4 border border-[#3a3a4e] hover:border-indigo-500/50 transition-colors">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-100 mb-1">
+            {topology.name}
+          </h3>
+          {topology.description && (
+            <p className="text-sm text-gray-400 mb-2">{topology.description}</p>
+          )}
+          <div className="flex items-center space-x-4 text-xs text-gray-500">
+            <span>Created: {formatDate(topology.created_at)}</span>
+            <span>Updated: {formatDate(topology.updated_at)}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2 ml-4">
+          <button
+            onClick={onLoad}
+            className="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-500 transition-colors flex items-center space-x-1"
+            title="Load this topology"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Load</span>
+          </button>
+
+          <button
+            onClick={onExport}
+            className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-500 transition-colors flex items-center space-x-1"
+            title="Export as JSON"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export</span>
+          </button>
+
+          <button
+            onClick={onDelete}
+            className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-500 transition-colors flex items-center space-x-1"
+            title="Delete this topology"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete</span>
+          </button>
+        </div>
       </div>
     </div>
-
-    <div className="flex gap-2 flex-wrap">
-      <button
-        onClick={() => onLoad(scenario)}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-500 transition-colors"
-      >
-        <FolderOpen className="w-4 h-4" />
-        Load
-      </button>
-
-      <button
-        onClick={() => onExport(scenario)}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-500 transition-colors"
-      >
-        <Download className="w-4 h-4" />
-        Export
-      </button>
-
-      <button
-        onClick={() => onDelete(scenario.id!, scenario.name)}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-500 transition-colors"
-      >
-        <Trash2 className="w-4 h-4" />
-        Delete
-      </button>
-    </div>
-  </div>
-);
+  );
+};
