@@ -290,8 +290,8 @@ export const generateTopologyJSON = (
 
   return {
     gns3_server_ip: gns3ServerIp,
-    project_name: selectedProject?.name,
-    project_id: selectedProject?.project_id,
+    project_name: selectedProject?.project_name,
+    //project_id: selectedProject?.project_id,
     templates: templatesObj,
     topology_type: "HYBRID",
     created_at: new Date().toISOString(),

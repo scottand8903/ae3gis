@@ -10,7 +10,7 @@ export async function DELETE(
       throw new Error("AE3GIS_URL environment variable is not set");
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     const response = await fetch(`${AE3GIS_URL}/topologies/${id}`, {
       method: "DELETE",

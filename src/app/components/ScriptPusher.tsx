@@ -22,20 +22,72 @@ interface ScriptConfig {
   shell: string;
 }
 
+interface Device {
+  name: string;
+  count: number;
+}
+
+interface FirewallConfig {
+  count: number;
+}
+
 interface ScriptDeploymentProps {
-  nodes?: Array<{ node_id: string; name: string }>;
+  itDevices?: Device[];
+  otDevices?: Device[];
+  firewallConfig?: FirewallConfig;
   gns3ServerIp?: string;
+  createdServers?: string[];
 }
 
 const ScriptDeployment: React.FC<ScriptDeploymentProps> = ({ 
-  nodes = [],
-  gns3ServerIp = '192.168.1.156'
+  itDevices = [],
+  otDevices = [],
+  firewallConfig = { count: 0 },
+  gns3ServerIp,
+  createdServers = []
 }) => {
   const [scripts, setScripts] = useState<ScriptConfig[]>([]);
   const [concurrency, setConcurrency] = useState(5);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentStatus, setDeploymentStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
+
+  // Generate nodes from devices
+  const generateNodes = () => {
+    const nodes: Array<{ node_id: string; name: string }> = [];
+
+    // Generate IT device nodes
+    itDevices.forEach((device) => {
+      for (let i = 0; i < device.count; i++) {
+        nodes.push({
+          node_id: `${device.name}_${i + 1}`,
+          name: `${device.name}_${i + 1}`,
+        });
+      }
+    });
+
+    // Generate OT device nodes
+    otDevices.forEach((device) => {
+      for (let i = 0; i < device.count; i++) {
+        nodes.push({
+          node_id: `${device.name}_${i + 1}`,
+          name: `${device.name}_${i + 1}`,
+        });
+      }
+    });
+
+    // Generate firewall nodes
+    for (let i = 0; i < firewallConfig.count; i++) {
+      nodes.push({
+        node_id: `Firewall_${i + 1}`,
+        name: `Firewall_${i + 1}`,
+      });
+    }
+
+    return nodes;
+  };
+
+  const nodes = generateNodes();
 
   // Add initial empty script configuration
   useEffect(() => {
@@ -87,36 +139,65 @@ const ScriptDeployment: React.FC<ScriptDeploymentProps> = ({
     setIsDeploying(true);
     setDeploymentStatus('idle');
     setStatusMessage('');
+    for (const serverIp of createdServers) {
+      const deploymentPromises = createdServers.map(async (serverIp) => {
+        try {
+          const payload = {
+            scripts: scripts.map(({ id, ...script }) => script),
+            gns3_server_ip: serverIp,
+            concurrency
+          };
 
-    try {
-      const payload = {
-        scripts: scripts.map(({ id, ...script }) => script),
-        gns3_server_ip: gns3ServerIp,
-        concurrency
-      };
+          console.log('Deploying scripts to', serverIp, ':', payload);
 
-      console.log('Deploying scripts:', payload);
+          const response = await fetch('/api/gns3/push-script', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
 
-      const response = await fetch('/api/gns3/push-script', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+          if (!response.ok) {
+            throw new Error(`Deployment to ${serverIp} failed: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          console.log('Deployment result for', serverIp, ':', result);
+          return { serverIp, success: true, result };
+        } catch (error) {
+          console.error('Deployment error for', serverIp, ':', error);
+          return { 
+            serverIp, 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Deployment failed' 
+          };
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`Deployment failed: ${response.statusText}`);
+      try {
+        const results = await Promise.all(deploymentPromises);
+        
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.filter(r => !r.success).length;
+        
+        if (failCount === 0) {
+          setDeploymentStatus('success');
+          setStatusMessage(`Successfully deployed ${scripts.length} script(s) to all ${createdServers.length} servers`);
+        } else if (successCount === 0) {
+          setDeploymentStatus('error');
+          setStatusMessage(`Failed to deploy to all ${createdServers.length} servers`);
+        } else {
+          setDeploymentStatus('warning');
+          setStatusMessage(`Deployed to ${successCount}/${createdServers.length} servers. ${failCount} failed.`);
+        }
+        
+        console.log('All deployment results:', results);
+      } catch (error) {
+        setDeploymentStatus('error');
+        setStatusMessage('Deployment failed');
+        console.error('Deployment error:', error);
+      } finally {
+        setIsDeploying(false);
       }
-
-      const result = await response.json();
-      setDeploymentStatus('success');
-      setStatusMessage(`Successfully deployed ${scripts.length} script(s)`);
-      console.log('Deployment result:', result);
-    } catch (error) {
-      setDeploymentStatus('error');
-      setStatusMessage(error instanceof Error ? error.message : 'Deployment failed');
-      console.error('Deployment error:', error);
-    } finally {
-      setIsDeploying(false);
     }
   };
 
@@ -127,7 +208,7 @@ const ScriptDeployment: React.FC<ScriptDeploymentProps> = ({
           Script Deployment
         </h1>
         <p className="text-gray-400">
-          Deploy and execute scripts on network nodes
+          Deploy and execute scripts on network nodes ({nodes.length} nodes available)
         </p>
       </div>
 
