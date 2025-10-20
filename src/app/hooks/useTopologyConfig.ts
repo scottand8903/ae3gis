@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DeviceConfig, Template, DeviceType } from "../types/topology";
 import {
   defaultItDevices,
@@ -13,37 +13,37 @@ export const useTopologyConfig = (templates: Template[]) => {
     defaultFirewallConfig
   );
 
-  // SCOTT TEMPLATE NAMES
-  // Template mapping for specific device types
+    // SCOTT TEMPLATE NAMES
+    // Template mapping for specific device types
+    //const getTemplateId = (deviceName: string): string => {
+    //  const templateMap: Record<string, string> = {
+    //    Workstations: "benign-client",
+    //    // Workstation: "benign-client",
+    //    Switches: "openvswitch-xp",
+    //    // Switch: "openvswitch-xp",
+    //    DHCP_Server: "isc-dhcp-server",
+    //    Web_Server: "apache-server",
+    //    PLC: "malicious-client",
+    //    HMI: "malicious-client",
+    //    Industrial_Switch: "openvswitch-xp",
+    //    Firewall: "iptables",
+    //  };
+    
+  // BRAXTON TEMPLATE NAMES
   const getTemplateId = (deviceName: string): string => {
     const templateMap: Record<string, string> = {
-      Workstations: "benign-client",
-      // Workstation: "benign-client",
-      Switches: "openvswitch-xp",
-      // Switch: "openvswitch-xp",
-      DHCP_Server: "isc-dhcp-server",
-      Web_Server: "apache-server",
-      PLC: "malicious-client",
-      HMI: "malicious-client",
-      Industrial_Switch: "openvswitch-xp",
-      Firewall: "iptables",
+      Workstations: "tollan-benign-client",
+      Workstation: "tollan-benign-client",
+      Switches: "tollan-openvswitch-xp",
+      Switch: "tollan-openvswitch-xp",
+      DHCP_Server: "tollan-isc-dhcp-server",
+      Web_Server: "tollan-apache-server",
+      PLC: "tollan-malicious-client",
+      HMI: "tollan-malicious-client",
+      Industrial_Switch: "tollan-openvswitch-xp",
+      Firewall: "tollan-iptables",
+      DNS_Server: "tollan-benign-client"
     };
-
-    // BRAXTON TEMPLATE NAMES
-    //     // Template mapping for specific device types
-    // const getTemplateId = (deviceName: string): string => {
-    //   const templateMap: Record<string, string> = {
-    //     Workstations: "tollan-benign-client",
-    //     Workstation: "tollan-benign-client",
-    //     Switches: "tollan-openvswitch-xp",
-    //     Switch: "tollan-openvswitch-xp",
-    //     "DHCP Server": "tollan-isc-dhcp-server",
-    //     "Web Server": "tollan-apache-server",
-    //     PLC: "tollan-tollan-malicious-client",
-    //     HMI: "tollan-malicious-client",
-    //     "Industrial Switch": "tollan-openvswitch-xp",
-    //     Firewall: "tollan-iptables",
-    //   };
 
     const templateName = templateMap[deviceName];
     if (templateName) {
@@ -57,29 +57,32 @@ export const useTopologyConfig = (templates: Template[]) => {
     return templates[0]?.template_id || "";
   };
 
-  const initializeTemplateIds = () => {
-    // Update IT devices with template IDs
+  // Automatically initialize template IDs when templates are loaded
+  useEffect(() => {
+    if (templates.length === 0) return;
+
+    // Update IT devices with template IDs (only if not already set)
     setItDevices((prev) =>
       prev.map((device) => ({
         ...device,
-        templateId: getTemplateId(device.name),
+        templateId: device.templateId || getTemplateId(device.name),
       }))
     );
 
-    // Update OT devices with template IDs
+    // Update OT devices with template IDs (only if not already set)
     setOtDevices((prev) =>
       prev.map((device) => ({
         ...device,
-        templateId: getTemplateId(device.name),
+        templateId: device.templateId || getTemplateId(device.name),
       }))
     );
 
-    // Update firewall with template ID
+    // Update firewall with template ID (only if not already set)
     setFirewallConfig((prev) => ({
       ...prev,
-      templateId: getTemplateId(prev.name),
+      templateId: prev.templateId || getTemplateId(prev.name),
     }));
-  };
+  }, [templates]); // Only re-run when templates change
 
   const updateDeviceCount = (
     deviceName: string,
@@ -138,7 +141,6 @@ export const useTopologyConfig = (templates: Template[]) => {
     otDevices,
     firewallConfig,
     setFirewallConfig,
-    initializeTemplateIds,
     updateDeviceCount,
     updateDeviceTemplate,
     removeDevice,

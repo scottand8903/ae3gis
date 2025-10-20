@@ -1,202 +1,106 @@
-import React, { useState, useEffect } from "react";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import React, { useState } from "react";
 
-interface IpInputProps {
-  onIpChange?: (ip: string) => void;
-  onValidConnection?: (isValid: boolean) => void;
+interface ManualIpAdderProps {
+  onIpsAdded: (ips: string[]) => void;
+  currentIps: string[];
 }
 
-export const IpInput: React.FC<IpInputProps> = ({ 
-  onIpChange, 
-  onValidConnection 
-}) => {
-  // Extract IP from environment variable on component mount
-  const [ip, setIp] = useState<string>("");
-  const [port, setPort] = useState<string>("80");
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
-  const [errorMessage, setErrorMessage] = useState<string>("");
+export const ManualIpAdder: React.FC<ManualIpAdderProps> = ({ onIpsAdded, currentIps }) => {
+  const [ipInput, setIpInput] = useState("");
 
-  useEffect(() => {
-    // Parse the GNS3_URL from environment variable
-    // This will be available at build time via NEXT_PUBLIC_ prefix
-    const gns3Url = process.env.NEXT_PUBLIC_GNS3_URL;
+  const handleAddIp = (e: React.FormEvent) => {
+    e.preventDefault();
     
-    if (gns3Url) {
-      try {
-        const url = new URL(gns3Url);
-        const extractedIp = url.hostname;
-        const extractedPort = url.port || "80";
-        
-        setIp(extractedIp);
-        setPort(extractedPort);
-        
-        // Notify parent component if needed
-        if (onIpChange) {
-          onIpChange(extractedIp);
-        }
-      } catch (error) {
-        console.error("Invalid GNS3_URL format:", error);
-      }
-    }
-  }, [onIpChange]);
+    const trimmedIp = ipInput.trim();
+    if (!trimmedIp) return;
 
-  const validateIp = (ipAddress: string): boolean => {
-    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-    return ipRegex.test(ipAddress);
-  };
-
-  const testConnection = async () => {
-    if (!validateIp(ip)) {
-      setConnectionStatus("error");
-      setErrorMessage("Invalid IP address format");
+    // Basic IP validation (optional)
+    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (!ipPattern.test(trimmedIp)) {
+      alert("Please enter a valid IP address (e.g., 192.168.1.1)");
       return;
     }
 
-    setIsConnecting(true);
-    setConnectionStatus("idle");
-    setErrorMessage("");
-
-    try {
-      // Test connection to GNS3 server
-      const response = await fetch("/api/gns3/projects");
-      
-      if (response.ok) {
-        setConnectionStatus("success");
-        if (onValidConnection) {
-          onValidConnection(true);
-        }
-      } else {
-        throw new Error("Failed to connect to GNS3 server");
-      }
-    } catch (error) {
-      setConnectionStatus("error");
-      setErrorMessage("Could not connect to GNS3 server. Please check IP and ensure server is running.");
-      if (onValidConnection) {
-        onValidConnection(false);
-      }
-    } finally {
-      setIsConnecting(false);
+    // Check if IP already exists
+    if (currentIps.includes(trimmedIp)) {
+      alert("This IP is already in the list");
+      return;
     }
+
+    onIpsAdded([...currentIps, trimmedIp]);
+    setIpInput("");
   };
 
-  const handleIpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newIp = e.target.value;
-    setIp(newIp);
-    setConnectionStatus("idle");
-    
-    if (onIpChange) {
-      onIpChange(newIp);
-    }
+  const handleRemoveIp = (ipToRemove: string) => {
+    onIpsAdded(currentIps.filter(ip => ip !== ipToRemove));
   };
 
-  const handlePortChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPort(e.target.value);
-    setConnectionStatus("idle");
-  };
-
-  const updateEnvVariable = () => {
-    // Note: You cannot directly update .env variables from the client side
-    // This would need to be handled by your build process or server
-    const newUrl = `http://${ip}:${port}/v2`;
-    
-    // For development, you might want to store this in localStorage
-    // or pass it to your API routes
-    localStorage.setItem("GNS3_URL", newUrl);
-    
-    // Show instructions to user
-    alert(`To make this permanent, update your .env.local file:\nNEXT_PUBLIC_GNS3_URL=${newUrl}`);
+  const handleClearAll = () => {
+    onIpsAdded([]);
   };
 
   return (
-    <div className="bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
+    <div className="mb-8 bg-[#2a2a3e] rounded-lg p-6 border border-[#3a3a4e]">
       <h2 className="text-xl font-semibold text-gray-100 mb-4">
-        GNS3 Server Configuration
+        Manual IP Management
       </h2>
-      
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Server IP Address
-            </label>
-            <input
-              type="text"
-              value={ip}
-              onChange={handleIpChange}
-              placeholder="192.168.56.102"
-              className={`w-full px-3 py-2 bg-[#252535] text-gray-200 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                connectionStatus === "error" 
-                  ? "border-red-500" 
-                  : connectionStatus === "success"
-                  ? "border-green-500"
-                  : "border-[#3a3a4e]"
-              }`}
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Port
-            </label>
-            <input
-              type="text"
-              value={port}
-              onChange={handlePortChange}
-              placeholder="80"
-              className="w-full px-3 py-2 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        </div>
 
-        {/* Connection Status */}
-        {connectionStatus === "success" && (
-          <div className="flex items-center space-x-2 text-green-400">
-            <CheckCircle className="w-5 h-5" />
-            <span className="text-sm">Connected successfully to GNS3 server</span>
-          </div>
-        )}
-        
-        {connectionStatus === "error" && (
-          <div className="flex items-center space-x-2 text-red-400">
-            <AlertCircle className="w-5 h-5" />
-            <span className="text-sm">{errorMessage}</span>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex space-x-3">
+      {/* Add IP Form */}
+      <form onSubmit={handleAddIp} className="mb-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={ipInput}
+            onChange={(e) => setIpInput(e.target.value)}
+            placeholder="Enter IP address (e.g., 192.168.1.1)"
+            className="flex-1 px-4 py-2 bg-[#252535] text-gray-200 border border-[#3a3a4e] rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
           <button
-            onClick={testConnection}
-            disabled={isConnecting || !ip}
-            className={`px-4 py-2 font-medium rounded-lg transition-colors ${
-              isConnecting
-                ? "bg-gray-600 text-gray-400 cursor-not-allowed"
-                : "bg-indigo-600 text-white hover:bg-indigo-500"
-            }`}
+            type="submit"
+            className="px-6 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 transition-colors"
           >
-            {isConnecting ? "Testing..." : "Test Connection"}
-          </button>
-          
-          <button
-            onClick={updateEnvVariable}
-            disabled={!validateIp(ip)}
-            className="px-4 py-2 bg-[#333347] text-gray-200 font-medium rounded-lg hover:bg-[#3a3a4e] transition-colors border border-[#3a3a4e]"
-          >
-            Save Configuration
+            Add IP
           </button>
         </div>
+      </form>
 
-        {/* Info Box */}
-        <div className="mt-4 p-3 bg-[#252535] rounded-lg border border-[#3a3a4e]">
-          <p className="text-sm text-gray-400">
-            <span className="font-semibold">Current Environment:</span> {process.env.NEXT_PUBLIC_GNS3_URL || "Not set"}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            To permanently update, modify NEXT_PUBLIC_GNS3_URL in your .env.local file
-          </p>
+      {/* Current IPs List */}
+      {currentIps.length > 0 && (
+        <div>
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm font-medium text-gray-300">
+              Server IPs ({currentIps.length})
+            </h3>
+            <button
+              onClick={handleClearAll}
+              className="text-sm text-red-400 hover:text-red-300 transition-colors"
+            >
+              Clear All
+            </button>
+          </div>
+          
+          <div className="border border-[#3a3a4e] rounded-lg divide-y divide-[#3a3a4e]">
+            {currentIps.map((ip, index) => (
+              <div
+                key={index}
+                className="flex justify-between items-center p-3 bg-[#252535] hover:bg-[#2a2a45] transition-colors"
+              >
+                <code className="text-indigo-400 font-mono text-sm">
+                  {ip}
+                </code>
+                <button
+                  onClick={() => handleRemoveIp(ip)}
+                  className="text-red-400 hover:text-red-300 text-sm transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
+
+export default ManualIpAdder;

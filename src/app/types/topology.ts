@@ -43,6 +43,6 @@ export type DeviceType = {
 };
 
 export type Project = {
-  project_id: string;
+  project_name: string;
   name: string;
 };
